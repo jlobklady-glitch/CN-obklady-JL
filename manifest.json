@@ -1,0 +1,27 @@
+{
+  "name": "JL-OBKLADY CN",
+  "short_name": "JL-OBKLADY",
+  "description": "Správa zakázek — obklady a dlažby",
+  "start_url": "/cn-obklady/",
+  "scope": "/cn-obklady/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1C1917",
+  "theme_color": "#1C1917",
+  "lang": "cs",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
