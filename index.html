@@ -195,7 +195,20 @@ body {
   /* Texture overlay — jemný šum */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
 }
-
+<script>
+window.addEventListener('error', function(e) {
+  document.body.style.cssText = 'background:white;padding:20px;font-family:monospace';
+  document.body.innerHTML = '<h2 style="color:red">CHYBA</h2>'
+    + '<p><b>Zpráva:</b> ' + e.message + '</p>'
+    + '<p><b>Soubor:</b> ' + e.filename + '</p>'
+    + '<p><b>Řádek:</b> ' + e.lineno + '</p>';
+}, true);
+window.addEventListener('unhandledrejection', function(e) {
+  document.body.style.cssText = 'background:white;padding:20px;font-family:monospace';
+  document.body.innerHTML = '<h2 style="color:red">PROMISE CHYBA</h2>'
+    + '<p>' + (e.reason?.message || e.reason || 'neznámá') + '</p>';
+}, true);
+</script>
 /* ── LAYOUT ───────────────────────────────────────────────── */
 .app {
   max-width: 680px;
