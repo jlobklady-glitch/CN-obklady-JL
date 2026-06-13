@@ -175,6 +175,16 @@ html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
+   <script>
+window.onerror = function(msg, src, line, col, err) {
+  document.body.style.background = 'white';
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:14px;color:red">'
+    + '<b>CHYBA:</b><br>' + msg + '<br><br>'
+    + '<b>Soubor:</b> ' + src + '<br>'
+    + '<b>Řádek:</b> ' + line
+    + '</div>';
+};
+</script>
 body {
   font-family: var(--f-body);
   background: var(--c-bg);
