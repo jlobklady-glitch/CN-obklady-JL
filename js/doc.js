@@ -1,6 +1,6 @@
 // A4 dokument cenové nabídky ve vzhledu Excelu + tisk do PDF.
 import { h, esc, kc, num, fmtDate, addDays, parseNum } from './util.js';
-import { S, lineTotal, quoteTotal, typeLabel } from './store.js';
+import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA } from './store.js';
 import { czIban, spayd, qrSvg } from './pay.js';
 
 export function quoteDoc(q) {
@@ -47,6 +47,7 @@ export function quoteDoc(q) {
     <div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div>
     <img class="strip" src="assets/strip-cn.jpg" alt="">
     <div class="foot">${esc(f.name)} · ${esc(f.phone)} · ${esc(f.email)}</div></div>
+    ${q.premium ? premiumPage(q, total) : ''}
   </div>`;
   return html;
 }
@@ -126,4 +127,21 @@ export function invoiceDoc(inv) {
         ${inv.paid ? '<div style="color:var(--ok);font-weight:800;margin-top:2mm">ZAPLACENO</div>' : ''}</div>
       <div style="width:34mm;height:34mm">${qr}</div></div>
     <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci.</div>${footer()}</div></div>`;
+}
+
+function premiumPage(q, base) {
+  const extra = (q.premium_items || []).filter((r) => r.name);
+  const sumExtra = quoteTotal(extra);
+  const qa = (S.firma.qa && S.firma.qa.length ? S.firma.qa : DEFAULT_QA).filter((x) => x.show && x.q);
+  const rows = extra.map((r) => `<tr><td colspan="2">${esc(r.name)}</td><td class="c">${esc(r.unit)}</td><td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
+  return `<div class="pagebreak"></div>
+    <div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">VARIANTA PREMIUM</div></div><div class="stripe"></div>
+    <div style="font-weight:800;font-size:13pt;margin:4mm 0 2mm">Varianta PREMIUM · proč se vyplatí</div>
+    <div style="font-size:9.5pt;color:#374151">Vedle standardního provedení nabízíme variantu PREMIUM – řešení, která prodlužují životnost, zlepšují hygienu a vzhled koupelny. Vybrat si můžete jednotlivé příplatky, nebo celý Premium balíček.</div>
+    <div class="lab" style="margin-top:4mm">Příplatky za Premium</div>
+    <table class="dt"><thead><tr><th class="l" colspan="2">POLOŽKA PREMIUM</th><th>MJ</th><th>MNOŽSTVÍ</th><th>CENA / MJ</th><th>CELKEM</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="total" style="background:var(--sand)"><div class="l" style="background:var(--sand);color:var(--ink)">Příplatky za Premium celkem</div><div class="v" style="background:var(--sand);color:var(--ink)">${kc(sumExtra)}</div></div>
+    <div class="total"><div class="l">CENA – VARIANTA PREMIUM</div><div class="v">${kc(base + sumExtra)}</div></div>
+    <div class="band" style="margin-top:6mm">NEJČASTĚJŠÍ OTÁZKY – PROČ SE PREMIUM VYPLATÍ</div>
+    ${qa.map((x) => `<div class="keep" style="margin-top:3mm"><div style="font-weight:800;font-size:10pt">${esc(x.q)}</div><div style="font-size:9pt;margin-top:.8mm">${esc(x.a)}</div></div>`).join('')}`;
 }

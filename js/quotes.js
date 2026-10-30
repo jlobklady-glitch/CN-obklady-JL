@@ -68,6 +68,30 @@ export async function quoteEditor(root, id) {
   const ed = itemsEditor(q.items, touch);
   const itemsBox = ed.box, totalV = ed.totalV;
 
+  // --- varianta Premium
+  q.premium_items = q.premium_items || [];
+  const pedBox = h('div');
+  const premiumCard = h('div', { class: 'card' });
+  const drawPremium = () => {
+    pedBox.replaceChildren();
+    if (!q.premium) { premiumCard.replaceChildren(h('label', { class: 'row' }, h('input', { type: 'checkbox', style: { width: 'auto' }, onchange: (e) => { q.premium = e.target.checked; touch(); drawPremium(); } }), h('b', null, 'Nabídnout variantu PREMIUM (strana 2 s příplatky a Q&A)'))); return; }
+    const ped = itemsEditor(q.premium_items, touch);
+    const total = () => kc(quoteTotal(q.items) + quoteTotal(q.premium_items));
+    premiumCard.replaceChildren(
+      h('label', { class: 'row' }, h('input', { type: 'checkbox', checked: true, style: { width: 'auto' }, onchange: (e) => { q.premium = e.target.checked; touch(); drawPremium(); } }), h('b', null, 'Varianta PREMIUM – příplatky (strana 2 nabídky)')),
+      h('p', { class: 'muted' }, 'Zadejte množství a cenu příplatků. Cena Premium = nabídka + příplatky. Texty Q&A upravíte v Nastavení.'),
+      ped.box,
+      h('div', { class: 'row', style: { marginTop: '10px' } },
+        h('button', { class: 'btn ghost', onclick: () => { const have = new Set(q.premium_items.map((r) => r.name)); S.prices.filter((p) => p.category === 'ostatni' && /^PREMIUM/i.test(p.name) && !have.has(p.name)).forEach((p) => q.premium_items.push({ typ: 'ostatni', item_id: p.id, name: p.name, unit: p.unit, qty: '', price: p.price, disc: 0 })); ped.redraw(); touch(); } }, '+ Načíst položky PREMIUM z ceníku'),
+        h('button', { class: 'btn ghost', onclick: () => ped.add() }, '+ Přidat řádek'),
+        h('button', { class: 'btn gold', onclick: async () => {
+          const pick = q.premium_items.filter((r) => r.name && parseNum(r.qty) > 0);
+          if (!pick.length) return toast('Žádný příplatek nemá množství', 'err');
+          if (!(await confirmBox(`Přidat ${pick.length} položek Premium do tabulky nabídky? Strana Premium se pak v PDF nezobrazí.`))) return;
+          q.items.push(...pick); q.premium_items = []; q.premium = false; ed.redraw(); touch(); drawPremium(); toast('Položky Premium přidány do nabídky');
+        } }, 'Zákazník zvolil PREMIUM')));
+  };
+  drawPremium();
   const preview = h('div');
   const showPreview = () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: quoteDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); };
 
@@ -91,6 +115,7 @@ export async function quoteEditor(root, id) {
         h('button', { class: 'btn ghost', onclick: () => ed.add() }, '+ Přidat řádek'),
         h('span', { class: 'muted' }, 'Cenu i text můžete kdykoli přepsat ručně.')),
       h('div', { class: 'totalbar' }, h('div', { class: 'l' }, 'CELKEM K ÚHRADĚ'), totalV)),
+    premiumCard,
     h('div', { class: 'card' }, h('div', { class: 'grid c2' },
       field('Poznámka k nabídce', h('textarea', { oninput: bind('note') }, q.note || ''), 'span2'),
       field('Stav platby', h('select', { onchange: bind('payment_status') }, PLATBA.map((s) => h('option', { selected: s === q.payment_status }, s)))))),

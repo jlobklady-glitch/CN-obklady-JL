@@ -27,6 +27,14 @@ export const DEFAULT_FIRMA = {
   tagline: 'OBKLADY  ·  DLAŽBY  ·  KOUPELNY  ·  DEKORATIVNÍ STĚRKY',
 };
 
+export const DEFAULT_QA = [
+  { q: 'Spárovka: cementová, nebo epoxidová?', a: 'Cementová spára je běžné řešení pro standardní plochy – je levnější, snáze se zpracovává a po hodinách je pochůzná. Epoxidová spára je dvousložková, nenasákavá a velmi odolná mechanicky i chemicky, hladká a bez plísní, takže ve sprchovém koutě a na namáhaných místech zůstává dlouhodobě čistá a v jednotném odstínu. Je dražší a vyžaduje přesné míchání a zkušenost při zpracování, proto je součástí Premium.', show: true },
+  { q: 'Hydroizolace: proč Mapeguard WP 200 a odtokový žlab?', a: 'Standardní provedení zahrnuje stěrkovou hydroizolaci. V Premium ji nahrazuje systém Mapei Mapeguard WP 200 – hydroizolační membrána s vrstvou rouna, která se lepí na podklad a do které se obkládá. Pásky, tvarovky do rohů a manžety kolem odtoků dotvoří souvislou vodotěsnou vrstvu i v rozích a prostupech. V kombinaci s odtokovým žlabem voda spolehlivě odteče a nezatéká do konstrukce.', show: true },
+  { q: 'Jolly rohy, nebo lišty?', a: 'Jolly roh vzniká přesným řezem obkladu pod úhlem 45°, takže roh je ze stejného materiálu a se stejnou kresbou jako plocha. Odpadá plastová nebo kovová lišta, která se časem může poškodit, změnit barvu nebo zůstat viditelná. Výsledek je čistší a hodnotnější, vyžaduje ale přesné řezání a víc práce.', show: true },
+  { q: 'Proč WC tlačítko z obkladu, ne klasické?', a: 'Tlačítko zhotovené z obkladu splyne se stěnou – žádný plastový prvek, který ruší celkový vzhled, jednotný povrch a snadné čištění. Přístup k technice zůstává zajištěn. Je to zakázková práce na míru, proto patří do Premium.', show: true },
+  { q: 'Proč zvolit Premium?', a: 'Premium nestojí za vzhledem prvního dne, ale za tím, jak bude koupelna vypadat a fungovat za několik let. Hygiena, odolnost proti vlhkosti a bezchybné detaily snižují riziko oprav a nutnost zásahu do hotových povrchů.', show: true },
+];
+
 export const S = { user: null, firma: { ...DEFAULT_FIRMA }, firmaBase: { ...DEFAULT_FIRMA }, profile: null, contacts: [], prices: [], loaded: false };
 
 // Profil = kdo je právě přihlášený (Lukáš / Honza). Mění jen údaje dodavatele v záhlaví dokumentů, data jsou společná.
@@ -194,7 +202,7 @@ export async function saveQuote(q) {
   const row = {
     number: q.number, issued_on: q.issued_on, valid_days: q.valid_days, customer_id: q.customer_id || null,
     customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
-    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {},
+    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {}, premium_items: q.premium_items || [],
   };
   const { data, error } = await sb.from('quotes').update(row).eq('id', q.id).select().single();
   if (error) throw error;

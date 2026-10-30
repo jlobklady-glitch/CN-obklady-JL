@@ -228,3 +228,6 @@ details.card summary{cursor:pointer;font-weight:700}
 @media (max-width:520px){.rc-grid .pf.wide{grid-column:1/-1}.rc-grid{grid-template-columns:1fr 1fr}}
 .grid.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
 .grid.tiles .card{padding:10px}
+
+.doc .pagebreak{break-before:page;page-break-before:always;height:0}
+.preview-wrap .doc .pagebreak{height:0;border-top:2px dashed #b8b2a0;margin:10mm 0}
