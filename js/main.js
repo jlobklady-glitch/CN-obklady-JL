@@ -36,7 +36,7 @@ async function route() {
   if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; }
   const hash = location.hash || '#/nabidky';
   const main = h('main');
-  const bar = h('div', { class: 'topbar' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA')), h('div', { class: 'grow' }),
+  const bar = h('div', { class: 'topbar' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION)), h('div', { class: 'grow' }),
     h('nav', { class: 'tabs' }, TABS.map(([href, l]) => h('a', { href, class: hash.startsWith(href) || (href === '#/nabidky' && hash.startsWith('#/nabidka/')) ? 'active' : '' }, l)),
       h('a', { href: '#', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
   app.replaceChildren(h('div', { class: 'shell' }, bar, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
