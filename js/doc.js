@@ -121,12 +121,13 @@ export function invoiceDoc(inv) {
     <div class="keep"><div class="total"><div class="l">CELKEM K ÚHRADĚ</div><div class="v">${kc(inv.amount)}</div></div>
     <div style="display:flex;gap:6mm;align-items:center;margin-top:5mm">
       <div style="flex:1;font-size:10pt"><div class="lab">Platební údaje</div>
+        <div>Příjemce: <b>${esc(f.name)}</b></div>
         <div>Číslo účtu: <b>${esc(f.account)}</b>${f.bank ? ' (' + esc(f.bank) + ')' : ''}</div>
         <div>IBAN: ${esc(czIban(f.account))}</div><div>Variabilní symbol: <b>${esc(inv.number)}</b></div>
-        <div>Částka: <b>${kc(inv.amount)}</b></div>
+        <div>Částka: <b>${kc(inv.amount)}</b> · splatnost: <b>${fmtDate(inv.due_on)}</b></div>
         ${inv.paid ? '<div style="color:var(--ok);font-weight:800;margin-top:2mm">ZAPLACENO</div>' : ''}</div>
       <div style="width:34mm;height:34mm">${qr}</div></div>
-    <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci.</div>${footer()}</div></div>`;
+    <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci. Před odesláním platby zkontrolujte v bance číslo účtu, částku a variabilní symbol.</div>${footer()}</div></div>`;
 }
 
 function premiumPage(q, base) {
