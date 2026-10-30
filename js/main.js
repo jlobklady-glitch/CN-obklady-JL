@@ -94,4 +94,7 @@ async function boot() {
   route();
 }
 window.addEventListener('hashchange', route);
+// rozpracovaná úprava se uloží i při přepnutí aplikace / zavření karty
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && window.__flushSave) window.__flushSave().catch(() => {}); });
+window.addEventListener('pagehide', () => { if (window.__flushSave) window.__flushSave().catch(() => {}); });
 boot();

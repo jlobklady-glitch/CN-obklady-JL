@@ -41,11 +41,13 @@ export function fmtDate(d) {
   if (isNaN(x)) return '';
   return `${String(x.getDate()).padStart(2, '0')}.${String(x.getMonth() + 1).padStart(2, '0')}.${x.getFullYear()}`;
 }
-export const isoToday = () => new Date().toISOString().slice(0, 10);
+// Datum v místním čase (toISOString by u půlnoci v ČR vracelo předchozí den)
+const localIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const isoToday = () => localIso(new Date());
 export function addDays(iso, days) {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + Number(days || 0));
-  return d.toISOString().slice(0, 10);
+  return localIso(d);
 }
 
 // vyhledávání bez ohledu na diakritiku a velikost písmen

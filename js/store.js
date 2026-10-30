@@ -192,11 +192,13 @@ export async function nextQuoteNumber() {
   return `CN-${yr}-${String(mx + 1).padStart(3, '0')}`;
 }
 export async function newQuote() {
-  const number = await nextQuoteNumber();
-  const row = { number, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '' };
-  const { data, error } = await sb.from('quotes').insert(row).select().single();
-  if (error) throw error;
-  return data;
+  for (let i = 0; ; i++) {
+    const number = await nextQuoteNumber();
+    const row = { number, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '' };
+    const { data, error } = await sb.from('quotes').insert(row).select().single();
+    if (!error) return data;
+    if (error.code !== '23505' || i >= 3) throw error; // číslo mezitím zabral druhý uživatel
+  }
 }
 export async function saveQuote(q) {
   const row = {
@@ -218,12 +220,14 @@ export async function deleteQuote(id) {
   if (error) throw error;
 }
 export async function duplicateQuote(q) {
-  const number = await nextQuoteNumber();
-  const row = { ...q, id: undefined, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno', created_at: undefined, updated_at: undefined };
-  delete row.id; delete row.created_at; delete row.updated_at;
-  const { data, error } = await sb.from('quotes').insert(row).select().single();
-  if (error) throw error;
-  return data;
+  for (let i = 0; ; i++) {
+    const number = await nextQuoteNumber();
+    const row = { ...q, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno' };
+    delete row.id; delete row.created_at; delete row.updated_at;
+    const { data, error } = await sb.from('quotes').insert(row).select().single();
+    if (!error) return data;
+    if (error.code !== '23505' || i >= 3) throw error;
+  }
 }
 
 // ---------- import ceníků ze seed.json ----------
@@ -266,10 +270,12 @@ export async function createInvoice(row) {
   if (e1) throw e1;
   let mx = 0;
   for (const r of ex) { const n = parseInt(r.number.slice(4), 10); if (n > mx) mx = n; }
-  const number = `${yr}${String(mx + 1).padStart(3, '0')}`;
-  const { data, error } = await sb.from('invoices').insert({ ...row, number }).select().single();
-  if (error) throw error;
-  return data;
+  for (let i = 0; ; i++) {
+    const number = `${yr}${String(mx + 1 + i).padStart(3, '0')}`;
+    const { data, error } = await sb.from('invoices').insert({ ...row, number }).select().single();
+    if (!error) return data;
+    if (error.code !== '23505' || i >= 3) throw error;
+  }
 }
 export async function saveInvoice(i) {
   const row = { number: i.number, issued_on: i.issued_on, due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
