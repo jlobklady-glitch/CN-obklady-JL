@@ -1,5 +1,6 @@
 // Kontakty, ceníky, nastavení.
 import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
+import { makeBackup, restoreBackup } from './backup.js';
 import { S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
@@ -97,6 +98,7 @@ export function settingsView(root) {
     h('input', { type: 'text', inputmode: 'decimal', value: f.rates[w] ?? '', oninput: (e) => { f.rates[f.workers[i]] = parseNum(e.target.value); } }))));
   const pw = h('input', { type: 'password', placeholder: 'Nové heslo (min. 8 znaků)' });
   const imp = h('div', { class: 'muted' });
+  const bk = h('div', { class: 'muted', style: { marginTop: '8px' } });
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Nastavení')),
     h('div', { class: 'card' }, h('h2', null, 'Dodavatel – profil: ' + (P.label || S.profile)), h('div', { class: 'grid c2' },
@@ -121,6 +123,15 @@ export function settingsView(root) {
         if (pw.value.length < 8) return toast('Heslo musí mít alespoň 8 znaků', 'err');
         const { error } = await sb.auth.updateUser({ password: pw.value });
         if (error) toast(error.message, 'err'); else { pw.value = ''; toast('Heslo změněno'); } } }, 'Změnit heslo'))),
+    h('div', { class: 'card' }, h('h2', null, 'Záloha dat'),
+      h('p', { class: 'muted' }, 'Uloží všechno (nabídky, vyúčtování, faktury, kontakty, ceníky, sklad, hodiny) do jednoho souboru. V telefonu zvolte „Uložit na Disk“, na počítači se soubor stáhne. Doporučeno aspoň jednou týdně.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn gold', onclick: async (e) => { e.target.disabled = true; try { const r = await makeBackup(); if (!r.cancelled) bk.textContent = 'Záloha vytvořena: ' + r.name + ' (' + r.counts + ')'; } catch (er) { bk.textContent = 'Chyba: ' + er.message; } e.target.disabled = false; } }, 'Vytvořit zálohu'),
+        h('label', { class: 'btn ghost', style: { cursor: 'pointer' } }, 'Obnovit ze zálohy', h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
+          const file = e.target.files[0]; if (!file) return;
+          if (!(await confirmBox('Obnovit data ze zálohy? Záznamy se stejným číslem se přepíšou stavem ze zálohy; ostatní zůstanou.'))) return;
+          try { const r = await restoreBackup(file, (m) => { bk.textContent = 'Obnovuji ' + m; }); bk.textContent = 'Obnoveno (' + r + ').'; } catch (er) { bk.textContent = 'Chyba: ' + er.message; } e.target.value = ''; } }))),
+      bk),
     h('div', { class: 'card' }, h('h2', null, 'Import ceníků'),
       h('p', { class: 'muted' }, `Načte do databáze výchozí ceníky, firmu a kontakty (stávající položky se nepřepisují). Nyní v databázi: ${S.prices.length} položek.`),
       h('button', { class: 'btn ghost', onclick: async (e) => { e.target.disabled = true; try { const n = await importSeed((a, b) => { imp.textContent = `Importuji ${a}/${b}…`; }); imp.textContent = `Hotovo, přidáno ${n} položek.`; } catch (er) { imp.textContent = 'Chyba: ' + er.message; } e.target.disabled = false; } }, 'Importovat ceníky'), imp),
