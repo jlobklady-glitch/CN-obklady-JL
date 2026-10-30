@@ -25,7 +25,7 @@ export async function prehledView(root) {
     h('tbody', null, rows.length ? rows.map(row) : h('tr', null, h('td', { colspan: 5, class: 'muted' }, 'Nic k zobrazení.')))));
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Přehled')),
-    h('div', { class: 'grid c4', style: { marginBottom: '14px' } },
+    h('div', { class: 'grid tiles', style: { marginBottom: '14px' } },
       tile('Čeká na odpověď', String(by('Nabídka zaslána').length), kc(sum(by('Nabídka zaslána'))), '#/nabidky'),
       tile('Potvrzené / v realizaci', String(active.length), kc(sum(active)), '#/nabidky'),
       tile('Nezaplacené faktury', String(unpaid.length), kc(unpaidSum), '#/nabidky'),

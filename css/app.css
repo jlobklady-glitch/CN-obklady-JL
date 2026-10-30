@@ -216,3 +216,15 @@ table.dt tr{page-break-inside:avoid;break-inside:avoid}
   table.t.stack tr{background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
   table.t.stack td select{width:auto;max-width:60%}
 }
+
+/* ---------- karty záznamů ---------- */
+.rc{position:relative;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 40px 10px 10px}
+.rc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.rc-grid .pf.wide{grid-column:span 2}
+.rc .del{position:absolute;top:4px;right:4px;background:none;border:0;color:var(--bad);font-size:24px;cursor:pointer;padding:4px 8px}
+.rc .rowinfo{margin-top:6px}
+.rc textarea{min-height:38px}
+details.card summary{cursor:pointer;font-weight:700}
+@media (max-width:520px){.rc-grid .pf.wide{grid-column:1/-1}.rc-grid{grid-template-columns:1fr 1fr}}
+.grid.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}
+.grid.tiles .card{padding:10px}

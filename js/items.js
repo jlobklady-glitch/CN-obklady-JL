@@ -2,14 +2,14 @@
 import { h, kc, matcher, parseNum } from './util.js';
 import { S, TYPES, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal } from './store.js';
 
-export function suggestBox(input, onPick) {
+export function suggestBox(input, onPick, filter = () => true) {
   const wrap = h('div', { class: 'suggest-wrap' });
   let box = null, sel = -1, list = [];
   const close = () => { box?.remove(); box = null; sel = -1; };
   const show = () => {
     const m = matcher(input.value);
     if (input.value.trim().length < 2) return close();
-    list = S.prices.filter((p) => p.active && m(`${p.code} ${p.name}`)).slice(0, 40);
+    list = S.prices.filter((p) => p.active && filter(p) && m(`${p.code} ${p.name}`)).slice(0, 40);
     close();
     if (!list.length) return;
     box = h('div', { class: 'suggest' }, list.map((p, i) => h('div', { onmousedown: (e) => { e.preventDefault(); pick(i); } },

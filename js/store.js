@@ -252,3 +252,32 @@ export async function deleteInvoice(id) {
   const { error } = await sb.from('invoices').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ---------- záznamy (sklad, hodiny, náklady, zbylo navíc) ----------
+S.rec = {};
+export async function loadRecords(kind) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('records').select('*').eq('kind', kind).order('rec_date').order('created_at').range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  S.rec[kind] = out;
+  return out;
+}
+export async function addRecord(kind, data = {}, date = isoToday()) {
+  const { data: r, error } = await sb.from('records').insert({ kind, rec_date: date, data }).select().single();
+  if (error) throw error;
+  (S.rec[kind] = S.rec[kind] || []).push(r);
+  return r;
+}
+export async function saveRecord(r) {
+  const { error } = await sb.from('records').update({ rec_date: r.rec_date, data: r.data }).eq('id', r.id);
+  if (error) throw error;
+}
+export async function deleteRecord(r) {
+  const { error } = await sb.from('records').delete().eq('id', r.id);
+  if (error) throw error;
+  S.rec[r.kind] = (S.rec[r.kind] || []).filter((x) => x.id !== r.id);
+}

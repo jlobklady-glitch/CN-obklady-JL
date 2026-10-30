@@ -83,6 +83,13 @@ export function settingsView(root) {
   const f = { ...S.firma };
   const inp = (k, type = 'text') => h('input', { type, value: f[k] ?? '', oninput: (e) => { f[k] = type === 'number' ? parseNum(e.target.value) : e.target.value; } });
   const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
+  f.workers = f.workers && f.workers.length ? f.workers : ['Lukáš', 'Honza', 'Firma (JL-OBKLADY)'];
+  f.rates = f.rates || {};
+  const workersBox = h('div', { class: 'grid c3' }, f.workers.map((w, i) => h('div', null,
+    h('label', { class: 'f' }, 'Pracovník / plátce ' + (i + 1)),
+    h('input', { type: 'text', value: w, oninput: (e) => { const old = f.workers[i]; f.workers[i] = e.target.value; if (f.rates[old] !== undefined) { f.rates[e.target.value] = f.rates[old]; delete f.rates[old]; } } }),
+    h('label', { class: 'f', style: { marginTop: '6px' } }, 'Sazba (Kč/hod)'),
+    h('input', { type: 'text', inputmode: 'decimal', value: f.rates[w] ?? '', oninput: (e) => { f.rates[f.workers[i]] = parseNum(e.target.value); } }))));
   const pw = h('input', { type: 'password', placeholder: 'Nové heslo (min. 8 znaků)' });
   const imp = h('div', { class: 'muted' });
   root.replaceChildren(
@@ -94,6 +101,8 @@ export function settingsView(root) {
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
       fld('Sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
       fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; } }, f.terms || ''), 'span2')),
+      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: async () => { try { await saveFirma(f); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); } } }, 'Uložit'))),
+    h('div', { class: 'card' }, h('h2', null, 'Pracovníci a hodinové sazby'), workersBox,
       h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: async () => { try { await saveFirma(f); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); } } }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Heslo'), h('div', { class: 'row' }, h('div', { class: 'grow' }, pw),
       h('button', { class: 'btn', onclick: async () => {
