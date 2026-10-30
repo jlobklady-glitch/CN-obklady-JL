@@ -172,11 +172,16 @@ export async function saveQuote(q) {
   const row = {
     number: q.number, issued_on: q.issued_on, valid_days: q.valid_days, customer_id: q.customer_id || null,
     customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
-    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status,
+    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {},
   };
   const { data, error } = await sb.from('quotes').update(row).eq('id', q.id).select().single();
   if (error) throw error;
   return data;
+}
+export async function newBezCN() {
+  const q = await newQuote();
+  q.settlement = { bez: true, items: [], advance: 0, note: '' };
+  return saveQuote(q);
 }
 export async function deleteQuote(id) {
   const { error } = await sb.from('quotes').delete().eq('id', id);
@@ -210,4 +215,40 @@ export async function importSeed(onProgress) {
   }
   await loadAll();
   return todo.length;
+}
+
+// ---------- faktury ----------
+export async function listInvoices(quoteId) {
+  let q = sb.from('invoices').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false });
+  if (quoteId) q = q.eq('quote_id', quoteId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+export async function getInvoice(id) {
+  const { data, error } = await sb.from('invoices').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data;
+}
+export async function createInvoice(row) {
+  const yr = new Date().getFullYear();
+  const { data: ex, error: e1 } = await sb.from('invoices').select('number').like('number', `${yr}%`);
+  if (e1) throw e1;
+  let mx = 0;
+  for (const r of ex) { const n = parseInt(r.number.slice(4), 10); if (n > mx) mx = n; }
+  const number = `${yr}${String(mx + 1).padStart(3, '0')}`;
+  const { data, error } = await sb.from('invoices').insert({ ...row, number }).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function saveInvoice(i) {
+  const row = { number: i.number, issued_on: i.issued_on, due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
+    customer_ids: i.customer_ids, description: i.description, amount: parseNum(i.amount), paid: !!i.paid };
+  const { data, error } = await sb.from('invoices').update(row).eq('id', i.id).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function deleteInvoice(id) {
+  const { error } = await sb.from('invoices').delete().eq('id', id);
+  if (error) throw error;
 }

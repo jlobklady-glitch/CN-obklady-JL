@@ -2,6 +2,7 @@ import { h, toast } from './util.js';
 import { sb, S, loadAll } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
+import { settlementEditor, invoiceEditor } from './vyuctovani.js';
 import { contactsView, pricesView, settingsView } from './views.js';
 
 window.__ver = APP_VERSION;
@@ -37,11 +38,13 @@ async function route() {
   const hash = location.hash || '#/nabidky';
   const main = h('main');
   const bar = h('div', { class: 'topbar' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION)), h('div', { class: 'grow' }),
-    h('nav', { class: 'tabs' }, TABS.map(([href, l]) => h('a', { href, class: hash.startsWith(href) || (href === '#/nabidky' && hash.startsWith('#/nabidka/')) ? 'active' : '' }, l)),
+    h('nav', { class: 'tabs' }, TABS.map(([href, l]) => h('a', { href, class: hash.startsWith(href) || (href === '#/nabidky' && hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')) ? 'active' : '' }, l)),
       h('a', { href: '#', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
   app.replaceChildren(h('div', { class: 'shell' }, bar, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/kontakty')) contactsView(main);
     else if (hash.startsWith('#/ceniky')) pricesView(main);
     else if (hash.startsWith('#/nastaveni')) settingsView(main);
