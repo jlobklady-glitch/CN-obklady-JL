@@ -41,7 +41,7 @@ export function quoteDoc(q) {
       <tbody>${rows}</tbody></table>
     <div class="keep">
     <div class="total"><div class="l">CELKEM K ÚHRADĚ</div><div class="v">${kc(total)}</div></div>
-    <div class="small">Cena je orientační. Dodavatel není plátcem DPH – DPH se nepřičítá.</div>
+    <div class="small">Cena je orientační. Dodavatel není plátcem DPH, cena je tedy konečná a žádná další daň se k ní nepřipočítává.</div>
     <div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(q.note)}</div>
     <div class="terms">${esc(f.terms)}</div>
     <div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div>
