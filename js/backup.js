@@ -1,5 +1,6 @@
 // Záloha a obnova všech dat do jednoho souboru (JSON). Soubor lze uložit na Google Disk přes „Sdílet / Uložit“ v telefonu.
-import { sb, loadAll } from './store.js';
+import { sb, loadAll, markBackupDone } from './store.js';
+import { driveReady, uploadToDrive } from './drive.js';
 
 const TABLES = [['settings', 'key'], ['contacts', 'id'], ['price_items', 'id'], ['quotes', 'id'], ['invoices', 'id'], ['records', 'id']];
 
@@ -28,11 +29,12 @@ export async function makeBackup() {
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return { name, shared: true, counts: counts(data) }; } catch (e) { if (e.name === 'AbortError') return { name, cancelled: true }; }
+    try { await navigator.share({ files: [file], title: name }); await markBackupDone().catch(() => {}); return { name, shared: true, counts: counts(data) }; } catch (e) { if (e.name === 'AbortError') return { name, cancelled: true }; }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  await markBackupDone().catch(() => {});
   return { name, counts: counts(data) };
 }
 const counts = (d) => Object.entries(d.tables).map(([k, v]) => `${k}: ${v.length}`).join(', ');
@@ -50,4 +52,13 @@ export async function restoreBackup(file, onProgress) {
   }
   await loadAll();
   return counts(data);
+}
+
+// Záloha na Google Disk (a zapsání data poslední zálohy)
+export async function backupToDrive() {
+  if (!driveReady()) throw new Error('Google Disk není připojen.');
+  const b = await buildBackup();
+  const r = await uploadToDrive(b.name, b.blob);
+  await markBackupDone().catch(() => {});
+  return { name: r.name, counts: b.counts };
 }

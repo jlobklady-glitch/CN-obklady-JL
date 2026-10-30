@@ -1,7 +1,7 @@
 // Kontakty, ceníky, nastavení.
 import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
-import { makeBackup, restoreBackup, buildBackup } from './backup.js';
-import { driveReady, uploadToDrive } from './drive.js';
+import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
+import { driveReady } from './drive.js';
 import { S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
@@ -131,7 +131,7 @@ export function settingsView(root) {
         h('button', { class: 'btn', onclick: async (e) => {
           if (!driveReady()) { bk.textContent = 'Google Disk ještě není připojen – chybí Client ID (návod pošle Claude).'; return; }
           e.target.disabled = true; bk.textContent = 'Ukládám na Disk…';
-          try { const b = await buildBackup(); const r = await uploadToDrive(b.name, b.blob); bk.textContent = 'Uloženo na Google Disk: složka „JL-OBKLADY zálohy“, soubor ' + r.name + ' (' + b.counts + ')'; try { localStorage.setItem('jl-last-backup', String(Date.now())); } catch (_) { /* nic */ } }
+          try { const r = await backupToDrive(); bk.textContent = 'Uloženo na Google Disk: složka „JL-OBKLADY zálohy“, soubor ' + r.name + ' (' + r.counts + ')'; }
           catch (er) { bk.textContent = 'Chyba: ' + er.message; } e.target.disabled = false; } }, 'Uložit zálohu na Disk'),
         h('label', { class: 'btn ghost', style: { cursor: 'pointer' } }, 'Obnovit ze zálohy', h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
           const file = e.target.files[0]; if (!file) return;

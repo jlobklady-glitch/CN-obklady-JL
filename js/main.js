@@ -1,4 +1,5 @@
 import { h, toast } from './util.js';
+import { backupToDrive } from './backup.js';
 import { sb, S, loadAll, profileList, setProfile } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
@@ -67,7 +68,10 @@ async function route() {
   const bar = h('div', { class: 'topbar' },
     h('button', { class: 'burger', 'aria-label': 'Menu', onclick: () => { drawer.classList.add('open'); scrim.classList.add('open'); } }, h('span'), h('span'), h('span')),
     h('div', { class: 'brand' }, (TABS.find(([href]) => isActive(href)) || ['', 'JL-OBKLADY'])[1]), h('div', { class: 'grow' }), h('div', { class: 'brand logo' }, ((S.firmaBase.profiles || {})[S.profile] || {}).label || 'JL-OBKLADY'));
-  app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
+  const days = S.lastBackup ? Math.floor((Date.now() - new Date(S.lastBackup)) / 864e5) : null;
+  const bkBanner = (days === null || days >= 7) && !S.offline ? h('div', { class: 'banner' }, h('span', null, days === null ? 'Data ještě nebyla zálohována. ' : `Poslední záloha byla před ${days} dny. `),
+    h('button', { class: 'btn small gold', onclick: async (e) => { e.target.disabled = true; try { const r = await backupToDrive(); toast('Záloha uložena na Disk: ' + r.name); bkBanner.remove(); } catch (er) { toast(er.message, 'err'); e.target.disabled = false; } } }, 'Zálohovat teď')) : null;
+  app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, bkBanner, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
   stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);

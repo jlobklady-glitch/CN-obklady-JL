@@ -79,6 +79,8 @@ export async function loadAll() {
       fetchAll('settings'), fetchAll('contacts', 'name'), fetchAll('price_items', 'name'),
     ]);
     const f = settings.find((r) => r.key === 'firma');
+    const bk = settings.find((r) => r.key === 'backup');
+    S.lastBackup = bk && bk.value ? bk.value.last || null : null;
     S.firmaBase = { ...DEFAULT_FIRMA, ...(f ? f.value : {}) };
     readProfile();
     S.contacts = contacts;
@@ -94,6 +96,14 @@ export async function loadAll() {
     } catch (_) { /* nic */ }
     throw e;
   }
+}
+
+// Datum poslední zálohy je sdílené mezi oběma uživateli (nejen v jednom telefonu)
+export async function markBackupDone() {
+  const last = new Date().toISOString();
+  S.lastBackup = last;
+  const { error } = await sb.from('settings').upsert({ key: 'backup', value: { last } });
+  if (error) throw error;
 }
 
 export async function saveFirma(value) {
