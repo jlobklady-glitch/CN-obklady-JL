@@ -37,17 +37,17 @@ async function api(url, opts = {}) {
   return r.json();
 }
 
-async function folderId() {
-  const q = encodeURIComponent(`name='${FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+async function folderId(name = FOLDER) {
+  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
   const f = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
   if (f.files.length) return f.files[0].id;
   const c = await api('https://www.googleapis.com/drive/v3/files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }) });
+    body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' }) });
   return c.id;
 }
 
-export async function uploadToDrive(name, blob) {
-  const parent = await folderId();
+export async function uploadToDrive(name, blob, folder) {
+  const parent = await folderId(folder);
   const meta = { name, parents: [parent] };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));

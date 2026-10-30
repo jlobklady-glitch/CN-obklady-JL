@@ -4,6 +4,7 @@ import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, disp
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
 import { itemsEditor } from './items.js';
+import { savePdfToDrive, pdfName } from './pdf.js';
 
 const stavCls = { 'Dokončena': 'ok', 'Zamítnuta': 'bad', 'Potvrzena': 'blue', 'V realizaci': 'blue', 'Nabídka zaslána': 'gold' };
 
@@ -101,6 +102,7 @@ export async function quoteEditor(root, id) {
       h('h1', null, q.number), state,
       h('button', { class: 'btn ghost small', onclick: showPreview }, 'Náhled'),
       h('a', { href: '#/vyuctovani/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Vyúčtování'),
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(quoteDoc(q)); } }, 'PDF / Tisk')),
     h('div', { class: 'card' }, h('div', { class: 'grid c4' },
       field('Číslo nabídky', h('input', { type: 'text', value: q.number, oninput: bind('number') })),

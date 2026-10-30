@@ -2,6 +2,7 @@
 import { h, kc, fmtDate, debounce, toast, confirmBox, parseNum, isoToday, addDays } from './util.js';
 import { S, getQuote, saveQuote, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
+import { savePdfToDrive, pdfName } from './pdf.js';
 import { settlementDoc, settlementTotals, invoiceDoc, printDoc } from './doc.js';
 
 const put = (root, ...c) => root.replaceChildren(...c.filter(Boolean));
@@ -63,6 +64,7 @@ export async function settlementEditor(root, id) {
     h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/nabidky' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
     bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
@@ -94,6 +96,7 @@ export async function invoiceEditor(root, id) {
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Faktura ' + inv.number), state,
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
