@@ -1,5 +1,5 @@
 // Přehled: souhrn zakázek, nezaplacené faktury, rychlé přepnutí stavů.
-import { h, kc, fmtDate, toast } from './util.js';
+import { h, kc, fmtDate, toast, isoToday } from './util.js';
 import { STAV, listQuotes, listInvoices, saveQuote, quoteTotal } from './store.js';
 import { settlementTotals } from './doc.js';
 
@@ -10,6 +10,8 @@ export async function prehledView(root) {
   const by = (s) => quotes.filter((q) => q.status === s);
   const sum = (a) => a.reduce((t, q) => t + amount(q), 0);
   const unpaid = invoices.filter((i) => !i.paid);
+  const today = isoToday();
+  const overdue = unpaid.filter((i) => i.due_on && i.due_on < today);
   const unpaidSum = unpaid.reduce((t, i) => t + Number(i.amount), 0);
   const tile = (label, value, sub, href) => h('a', { href, class: 'card', style: { textDecoration: 'none', color: 'inherit', margin: 0 } },
     h('div', { class: 'muted' }, label), h('div', { style: { fontSize: '22px', fontWeight: 800, margin: '4px 0' } }, value), h('div', { class: 'muted' }, sub));
@@ -28,11 +30,11 @@ export async function prehledView(root) {
     h('div', { class: 'grid tiles', style: { marginBottom: '14px' } },
       tile('Čeká na odpověď', String(by('Nabídka zaslána').length), kc(sum(by('Nabídka zaslána'))), '#/nabidky'),
       tile('Potvrzené / v realizaci', String(active.length), kc(sum(active)), '#/nabidky'),
-      tile('Nezaplacené faktury', String(unpaid.length), kc(unpaidSum), '#/nabidky'),
+      tile('Nezaplacené faktury', String(unpaid.length), kc(unpaidSum) + (overdue.length ? ` · po splatnosti: ${overdue.length}` : ''), '#/nabidky'),
       tile('Rozpracované', String(by('Rozpracovaná').length), kc(sum(by('Rozpracovaná'))), '#/nabidky')),
     h('h2', null, 'Probíhající zakázky'), table(active),
     h('h2', { style: { marginTop: '16px' } }, 'Nabídky čekající na odpověď'), table(by('Nabídka zaslána')),
     unpaid.length ? h('div', null, h('h2', { style: { marginTop: '16px' } }, 'Nezaplacené faktury'),
       h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', null, unpaid.map((i) => h('tr', { style: { cursor: 'pointer' }, onclick: () => { location.hash = '#/faktura/' + i.id; } },
-        h('td', null, h('b', null, i.number)), h('td', null, i.customer_name), h('td', null, 'splatnost ' + fmtDate(i.due_on)), h('td', { class: 'r' }, kc(i.amount)))))))) : null);
+        h('td', null, h('b', null, i.number)), h('td', null, i.customer_name), h('td', null, 'splatnost ' + fmtDate(i.due_on) + ' ', i.due_on && i.due_on < today ? h('span', { class: 'badge bad' }, 'po splatnosti') : null), h('td', { class: 'r' }, kc(i.amount)))))))) : null);
 }
