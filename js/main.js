@@ -3,6 +3,7 @@ import { sb, S, loadAll } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
+import { prehledView } from './prehled.js';
 import { contactsView, pricesView, settingsView } from './views.js';
 
 window.__ver = APP_VERSION;
@@ -30,12 +31,12 @@ function loginView(msg) {
     h('div', { class: 'card' }, h('div', { class: 'grid' }, email, pass, h('button', { class: 'btn gold', onclick: go }, 'Přihlásit')), err)));
 }
 
-const TABS = [['#/nabidky', 'Nabídky'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
+const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 async function route() {
   if (!S.user) return;
   if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; }
-  const hash = location.hash || '#/nabidky';
+  const hash = location.hash || '#/prehled';
   const main = h('main');
   const bar = h('div', { class: 'topbar' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION)), h('div', { class: 'grow' }),
     h('nav', { class: 'tabs' }, TABS.map(([href, l]) => h('a', { href, class: hash.startsWith(href) || (href === '#/nabidky' && hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')) ? 'active' : '' }, l)),
@@ -45,6 +46,7 @@ async function route() {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/prehled')) await prehledView(main);
     else if (hash.startsWith('#/kontakty')) contactsView(main);
     else if (hash.startsWith('#/ceniky')) pricesView(main);
     else if (hash.startsWith('#/nastaveni')) settingsView(main);
