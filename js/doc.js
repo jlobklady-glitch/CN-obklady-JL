@@ -1,5 +1,5 @@
 // A4 dokument cenové nabídky ve vzhledu Excelu + tisk do PDF.
-import { h, esc, kc, num, fmtDate, addDays, parseNum } from './util.js';
+import { h, esc, kc, num, fmtDate, addDays, parseNum, isoToday } from './util.js';
 import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA } from './store.js';
 import { czIban, spayd, qrSvg } from './pay.js';
 
@@ -96,7 +96,7 @@ export function settlementDoc(q) {
   if (t.advance) sum.push(['Uhrazená záloha', kc(-t.advance)]);
   return `<div class="doc">${headBar('FINÁLNÍ VYÚČTOVÁNÍ')}${partiesHtml(q)}
     <div class="boxes"><div><div class="bl">K nabídce č.</div><div class="bv">${t.bez ? 'bez CN' : esc(q.number)}</div></div>
-      <div><div class="bl">Datum vyúčtování</div><div class="bv">${fmtDate(st.date || new Date().toISOString().slice(0, 10))}</div></div>
+      <div><div class="bl">Datum vyúčtování</div><div class="bv">${fmtDate(st.date || isoToday())}</div></div>
       <div><div class="bl">Stavba</div><div class="bv" style="font-size:10pt">${esc(q.project)}</div></div></div>
     <table class="dt"><thead><tr><th>#</th><th class="l">TYP</th><th class="l">POLOŽKA</th><th>MJ</th><th>MNOŽSTVÍ</th><th>CENA / MJ</th><th>SLEVA</th><th>CELKEM</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="keep">${sum.map(([l, v]) => `<div class="total" style="background:var(--sand)"><div class="l" style="background:var(--sand);color:var(--ink)">${l}</div><div class="v" style="background:var(--sand);color:var(--ink)">${v}</div></div>`).join('')}
