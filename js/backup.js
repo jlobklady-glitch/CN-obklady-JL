@@ -14,6 +14,13 @@ async function all(table) {
   return out;
 }
 
+export async function buildBackup() {
+  const data = { app: 'jl-obklady', created: new Date().toISOString(), tables: {} };
+  for (const [t] of TABLES) data.tables[t] = await all(t);
+  const name = `JL-OBKLADY-zaloha-${data.created.slice(0, 10)}.json`;
+  return { data, name, blob: new Blob([JSON.stringify(data)], { type: 'application/json' }), counts: counts(data) };
+}
+
 export async function makeBackup() {
   const data = { app: 'jl-obklady', created: new Date().toISOString(), tables: {} };
   for (const [t] of TABLES) data.tables[t] = await all(t);

@@ -1,6 +1,7 @@
 // Kontakty, ceníky, nastavení.
 import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
-import { makeBackup, restoreBackup } from './backup.js';
+import { makeBackup, restoreBackup, buildBackup } from './backup.js';
+import { driveReady, uploadToDrive } from './drive.js';
 import { S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
@@ -127,6 +128,11 @@ export function settingsView(root) {
       h('p', { class: 'muted' }, 'Uloží všechno (nabídky, vyúčtování, faktury, kontakty, ceníky, sklad, hodiny) do jednoho souboru. V telefonu zvolte „Uložit na Disk“, na počítači se soubor stáhne. Doporučeno aspoň jednou týdně.'),
       h('div', { class: 'row' },
         h('button', { class: 'btn gold', onclick: async (e) => { e.target.disabled = true; try { const r = await makeBackup(); if (!r.cancelled) bk.textContent = 'Záloha vytvořena: ' + r.name + ' (' + r.counts + ')'; } catch (er) { bk.textContent = 'Chyba: ' + er.message; } e.target.disabled = false; } }, 'Vytvořit zálohu'),
+        h('button', { class: 'btn', onclick: async (e) => {
+          if (!driveReady()) { bk.textContent = 'Google Disk ještě není připojen – chybí Client ID (návod pošle Claude).'; return; }
+          e.target.disabled = true; bk.textContent = 'Ukládám na Disk…';
+          try { const b = await buildBackup(); const r = await uploadToDrive(b.name, b.blob); bk.textContent = 'Uloženo na Google Disk: složka „JL-OBKLADY zálohy“, soubor ' + r.name + ' (' + b.counts + ')'; try { localStorage.setItem('jl-last-backup', String(Date.now())); } catch (_) { /* nic */ } }
+          catch (er) { bk.textContent = 'Chyba: ' + er.message; } e.target.disabled = false; } }, 'Uložit zálohu na Disk'),
         h('label', { class: 'btn ghost', style: { cursor: 'pointer' } }, 'Obnovit ze zálohy', h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
           const file = e.target.files[0]; if (!file) return;
           if (!(await confirmBox('Obnovit data ze zálohy? Záznamy se stejným číslem se přepíšou stavem ze zálohy; ostatní zůstanou.'))) return;
