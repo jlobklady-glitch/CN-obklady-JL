@@ -1,0 +1,213 @@
+// Data: klient Supabase, načítání a ukládání, výpočty cen.
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { isoToday, parseNum } from './util.js';
+
+export const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+});
+
+export const TYPES = [
+  { key: 'prace', label: 'Práce' },
+  { key: 'stena', label: 'Obklad (stěna)' },
+  { key: 'podlaha', label: 'Dlažba (podlaha)' },
+  { key: 'mapei', label: 'Materiál MAPEI' },
+  { key: 'kabe', label: 'Betonová stěrka KABE' },
+  { key: 'ostatni', label: 'Ostatní' },
+];
+export const typeLabel = (k) => (TYPES.find((t) => t.key === k) || {}).label || k;
+export const typeKey = (label) => (TYPES.find((t) => t.label === label) || {}).key || 'ostatni';
+
+export const STAV = ['Rozpracovaná', 'Nabídka zaslána', 'Potvrzena', 'V realizaci', 'Dokončena', 'Zamítnuta'];
+export const PLATBA = ['Nezaplaceno', 'Záloha uhrazena', 'Zaplaceno'];
+
+export const DEFAULT_FIRMA = {
+  name: '', ico: '', address: '', email: '', phone: '', web: '', account: '', bank: '',
+  instagram: '', youtube: '', valid_days: 30, due_days: 14, terms: '',
+  mapei_discount: 0.28, kabe_markup: 0,
+  tagline: 'OBKLADY  ·  DLAŽBY  ·  KOUPELNY  ·  DEKORATIVNÍ STĚRKY',
+};
+
+export const S = { user: null, firma: { ...DEFAULT_FIRMA }, contacts: [], prices: [], loaded: false };
+
+const CACHE_KEY = 'jl-cache-v1';
+
+async function fetchAll(table, order) {
+  const out = [];
+  const step = 1000;
+  for (let from = 0; ; from += step) {
+    let q = sb.from(table).select('*').range(from, from + step - 1);
+    if (order) q = q.order(order);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < step) break;
+  }
+  return out;
+}
+
+export async function loadAll() {
+  try {
+    const [settings, contacts, prices] = await Promise.all([
+      fetchAll('settings'), fetchAll('contacts', 'name'), fetchAll('price_items', 'name'),
+    ]);
+    const f = settings.find((r) => r.key === 'firma');
+    S.firma = { ...DEFAULT_FIRMA, ...(f ? f.value : {}) };
+    S.contacts = contacts;
+    S.prices = prices;
+    S.loaded = true;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ firma: S.firma, contacts, prices })); } catch (_) { /* plná paměť */ }
+    return true;
+  } catch (e) {
+    // offline: poslední načtená data
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (c) { S.firma = c.firma; S.contacts = c.contacts; S.prices = c.prices; S.loaded = true; S.offline = true; return true; }
+    } catch (_) { /* nic */ }
+    throw e;
+  }
+}
+
+export async function saveFirma(value) {
+  const { error } = await sb.from('settings').upsert({ key: 'firma', value });
+  if (error) throw error;
+  S.firma = { ...DEFAULT_FIRMA, ...value };
+}
+
+// ---------- kontakty ----------
+export async function saveContact(c) {
+  const row = { name: c.name.trim(), kind: c.kind, address: c.address, contact: c.contact, ico: c.ico, dic: c.dic, person: c.person, note: c.note };
+  let res;
+  if (c.id) res = await sb.from('contacts').update(row).eq('id', c.id).select().single();
+  else res = await sb.from('contacts').insert(row).select().single();
+  if (res.error) throw res.error;
+  const i = S.contacts.findIndex((x) => x.id === res.data.id);
+  if (i >= 0) S.contacts[i] = res.data; else S.contacts.push(res.data);
+  S.contacts.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  return res.data;
+}
+export async function deleteContact(id) {
+  const { error } = await sb.from('contacts').delete().eq('id', id);
+  if (error) throw error;
+  S.contacts = S.contacts.filter((x) => x.id !== id);
+}
+
+// ---------- ceníky ----------
+export async function savePrice(p) {
+  const row = { category: p.category, code: p.code || '', name: p.name, unit: p.unit || '', price: parseNum(p.price), pack: parseNum(p.pack) || 1, extra: p.extra || {}, active: p.active !== false };
+  let res;
+  if (p.id) res = await sb.from('price_items').update(row).eq('id', p.id).select().single();
+  else res = await sb.from('price_items').insert(row).select().single();
+  if (res.error) throw res.error;
+  const i = S.prices.findIndex((x) => x.id === res.data.id);
+  if (i >= 0) S.prices[i] = res.data; else S.prices.push(res.data);
+  return res.data;
+}
+export async function deletePrice(id) {
+  const { error } = await sb.from('price_items').delete().eq('id', id);
+  if (error) throw error;
+  S.prices = S.prices.filter((x) => x.id !== id);
+}
+
+// ---------- výpočet cen ----------
+export function kabeTier(item, qty) {
+  const tiers = (item.extra && item.extra.tiers) || [];
+  if (!tiers.length) return item.price;
+  const idx = Math.min(tiers.length, Math.max(1, Math.ceil((Number(qty) || 0) / 5))) - 1;
+  return tiers[idx];
+}
+
+export function priceFor(item, qty) {
+  const f = S.firma;
+  if (item.category === 'mapei') return Math.round(item.price * (1 - (Number(f.mapei_discount) || 0)) * 100) / 100;
+  if (item.category === 'kabe') return Math.round(kabeTier(item, qty) * (1 + (Number(f.kabe_markup) || 0)));
+  return Number(item.price) || 0;
+}
+
+export function displayName(item) {
+  if (item.category === 'mapei') {
+    const code = String(item.name).trim();
+    return `${code} | bal. ${Number(item.pack) || 1}${item.unit ? ' ' + item.unit : ''}`;
+  }
+  return item.name;
+}
+export function displayUnit(item) {
+  if (item.category === 'mapei') return 'bal.';
+  return item.unit || '';
+}
+
+export const lineTotal = (r) => {
+  const q = parseNum(r.qty), p = parseNum(r.price), d = parseNum(r.disc);
+  if (!r.name || !q || !Number.isFinite(p)) return 0;
+  return Math.round(q * p * (1 - d) * 100) / 100;
+};
+export const quoteTotal = (items) => items.reduce((s, r) => s + lineTotal(r), 0);
+
+// ---------- nabídky ----------
+export async function listQuotes() {
+  const { data, error } = await sb.from('quotes').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+export async function getQuote(id) {
+  const { data, error } = await sb.from('quotes').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data;
+}
+export async function nextQuoteNumber() {
+  const yr = new Date().getFullYear();
+  const { data, error } = await sb.from('quotes').select('number').like('number', `CN-${yr}-%`);
+  if (error) throw error;
+  let mx = 0;
+  for (const r of data) { const n = parseInt(r.number.split('-')[2], 10); if (n > mx) mx = n; }
+  return `CN-${yr}-${String(mx + 1).padStart(3, '0')}`;
+}
+export async function newQuote() {
+  const number = await nextQuoteNumber();
+  const row = { number, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '' };
+  const { data, error } = await sb.from('quotes').insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function saveQuote(q) {
+  const row = {
+    number: q.number, issued_on: q.issued_on, valid_days: q.valid_days, customer_id: q.customer_id || null,
+    customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
+    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status,
+  };
+  const { data, error } = await sb.from('quotes').update(row).eq('id', q.id).select().single();
+  if (error) throw error;
+  return data;
+}
+export async function deleteQuote(id) {
+  const { error } = await sb.from('quotes').delete().eq('id', id);
+  if (error) throw error;
+}
+export async function duplicateQuote(q) {
+  const number = await nextQuoteNumber();
+  const row = { ...q, id: undefined, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno', created_at: undefined, updated_at: undefined };
+  delete row.id; delete row.created_at; delete row.updated_at;
+  const { data, error } = await sb.from('quotes').insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// ---------- import ceníků ze seed.json ----------
+export async function importSeed(onProgress) {
+  const r = await fetch('data/seed.json', { cache: 'no-store' });
+  const seed = await r.json();
+  if (seed.settings && seed.settings.firma) await saveFirma({ ...DEFAULT_FIRMA, ...seed.settings.firma });
+  for (const c of seed.contacts || []) {
+    if (!S.contacts.some((x) => x.name.toLowerCase() === c.name.toLowerCase())) await saveContact(c);
+  }
+  const have = new Set(S.prices.map((p) => p.category + '|' + p.name));
+  const todo = seed.items.filter((i) => !have.has(i.category + '|' + i.name));
+  const step = 200;
+  for (let i = 0; i < todo.length; i += step) {
+    const chunk = todo.slice(i, i + step);
+    const { error } = await sb.from('price_items').insert(chunk);
+    if (error) throw error;
+    if (onProgress) onProgress(Math.min(todo.length, i + step), todo.length);
+  }
+  await loadAll();
+  return todo.length;
+}

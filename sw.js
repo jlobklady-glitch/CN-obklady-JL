@@ -1,5 +1,34 @@
-const CACHE_NAME = 'jl-obklady-cn-v1';
-const OFFLINE_URL = './index.html';
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.add(OFFLINE_URL))); self.skipWaiting(); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))))); self.clients.claim(); });
-self.addEventListener('fetch', e => { if (e.request.method!=='GET') return; e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE_NAME).then(ca=>ca.put(e.request,c)).catch(()=>{});return r;}).catch(()=>caches.match(e.request).then(c=>c||caches.match(OFFLINE_URL)))); });
+// Service worker: síť má přednost (nová verze se načte hned po připojení), offline se bere z mezipaměti.
+const CACHE = 'jl-obklady-v1';
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/main.js', 'vendor/supabase.js', 'manifest.webmanifest'];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // Supabase a ostatní se necachuje
+  e.respondWith(
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((r) => r || caches.match('index.html')))
+  );
+});
