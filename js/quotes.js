@@ -1,5 +1,5 @@
 // Nabídky: seznam a editor.
-import { h, kc, fmtDate, matcher, debounce, toast, confirmBox, parseNum, num, isoToday } from './util.js';
+import { h, kc, fmtDate, matcher, debounce, toast, confirmBox, conflictBox, parseNum, num, isoToday } from './util.js';
 import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
@@ -41,11 +41,22 @@ export async function quoteEditor(root, id) {
   q.items = q.items || [];
   const state = h('span', { class: 'savestate' }, 'Uloženo');
   let dirty = false;
-  const doSave = async () => {
-    try { const r = await saveQuote(q); q.updated_at = r.updated_at; dirty = false; state.textContent = 'Uloženo'; state.className = 'savestate'; }
-    catch (e) { state.textContent = 'Chyba ukládání'; toast('Nepodařilo se uložit: ' + e.message, 'err'); }
+  let resolving = false;
+  const doSave = async (force = false) => {
+    if (resolving) return;
+    try { await saveQuote(q, force === true); dirty = false; state.textContent = 'Uloženo'; state.className = 'savestate'; }
+    catch (e) {
+      if (e.conflict) {
+        resolving = true;
+        const c = await conflictBox('Tuto nabídku');
+        resolving = false;
+        if (c === 'reload') { dirty = false; window.__flushSave = null; return location.reload(); }
+        return doSave(true);
+      }
+      state.textContent = 'Chyba ukládání'; toast('Nepodařilo se uložit: ' + e.message, 'err');
+    }
   };
-  const autosave = debounce(doSave, 800);
+  const autosave = debounce(() => doSave(), 800);
   const touch = () => { dirty = true; state.textContent = 'Ukládám…'; state.className = 'savestate dirty'; autosave(); };
   window.__flushSave = async () => { if (dirty) await autosave.flush(); };
 

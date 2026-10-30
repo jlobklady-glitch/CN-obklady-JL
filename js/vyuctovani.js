@@ -1,11 +1,29 @@
 // Finální vyúčtování (k nabídce nebo bez CN) a faktury.
-import { h, kc, fmtDate, debounce, toast, confirmBox, parseNum, isoToday, addDays } from './util.js';
+import { h, kc, fmtDate, debounce, toast, confirmBox, conflictBox, parseNum, isoToday, addDays } from './util.js';
 import { S, getQuote, saveQuote, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 import { settlementDoc, settlementTotals, invoiceDoc, printDoc } from './doc.js';
 
 const put = (root, ...c) => root.replaceChildren(...c.filter(Boolean));
+
+// Uložení s ošetřením souběžné úpravy; vrací funkci doSave(force)
+function makeSaver(save, what, state, setDirty) {
+  let resolving = false;
+  const doSave = async (force = false) => {
+    if (resolving) return;
+    try { await save(force === true); setDirty(false); state.textContent = 'Uloženo'; state.className = 'savestate'; }
+    catch (e) {
+      if (e.conflict) {
+        resolving = true; const c = await conflictBox(what); resolving = false;
+        if (c === 'reload') { setDirty(false); window.__flushSave = null; return location.reload(); }
+        return doSave(true);
+      }
+      state.textContent = 'Chyba ukládání'; toast('Nepodařilo se uložit: ' + e.message, 'err');
+    }
+  };
+  return doSave;
+}
 const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
 
 export async function settlementEditor(root, id) {
@@ -15,8 +33,8 @@ export async function settlementEditor(root, id) {
   const bez = !!st.bez;
   const state = h('span', { class: 'savestate' }, 'Uloženo');
   let dirty = false;
-  const doSave = async () => { try { await saveQuote(q); dirty = false; state.textContent = 'Uloženo'; state.className = 'savestate'; } catch (e) { toast('Nepodařilo se uložit: ' + e.message, 'err'); } };
-  const autosave = debounce(doSave, 800);
+  const doSave = makeSaver((f) => saveQuote(q, f), 'Toto vyúčtování', state, (d) => { dirty = d; });
+  const autosave = debounce(() => doSave(), 800);
   const sums = h('div', { class: 'card' });
   const drawSums = () => {
     const t = settlementTotals(q);
@@ -86,8 +104,8 @@ export async function invoiceEditor(root, id) {
   try { inv = await getInvoice(id); } catch (e) { root.replaceChildren(h('div', { class: 'card' }, 'Faktura nenalezena.')); return; }
   const state = h('span', { class: 'savestate' }, 'Uloženo');
   let dirty = false;
-  const doSave = async () => { try { await saveInvoice(inv); dirty = false; state.textContent = 'Uloženo'; state.className = 'savestate'; } catch (e) { toast('Nepodařilo se uložit: ' + e.message, 'err'); } };
-  const autosave = debounce(doSave, 800);
+  const doSave = makeSaver((f) => saveInvoice(inv, f), 'Tuto fakturu', state, (d) => { dirty = d; });
+  const autosave = debounce(() => doSave(), 800);
   const preview = h('div');
   const draw = () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: invoiceDoc(inv) })); };
   const touch = () => { dirty = true; state.textContent = 'Ukládám…'; state.className = 'savestate dirty'; autosave(); draw(); };

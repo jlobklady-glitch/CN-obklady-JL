@@ -210,14 +210,32 @@ export async function newQuote() {
     if (error.code !== '23505' || i >= 3) throw error; // číslo mezitím zabral druhý uživatel
   }
 }
-export async function saveQuote(q) {
+// Optimistické zamykání: uložení projde jen tehdy, když se záznam od načtení nezměnil (updated_at).
+export class ConflictError extends Error { constructor() { super('Záznam mezitím upravil někdo jiný.'); this.conflict = true; } }
+
+async function guardedUpdate(table, row, id, stamp, force) {
+  if (force) {
+    const { data: cur, error: e0 } = await sb.from(table).select('updated_at').eq('id', id).maybeSingle();
+    if (e0) throw e0;
+    if (!cur) throw new Error('Záznam byl mezitím smazán.');
+    stamp = cur.updated_at;
+  }
+  let q = sb.from(table).update(row).eq('id', id);
+  if (stamp) q = q.eq('updated_at', stamp);
+  const { data, error } = await q.select().maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ConflictError();
+  return data;
+}
+
+export async function saveQuote(q, force = false) {
   const row = {
     number: q.number, issued_on: q.issued_on, valid_days: q.valid_days, customer_id: q.customer_id || null,
     customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
     project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {}, premium_items: q.premium_items || [],
   };
-  const { data, error } = await sb.from('quotes').update(row).eq('id', q.id).select().single();
-  if (error) throw error;
+  const data = await guardedUpdate('quotes', row, q.id, q.updated_at, force);
+  q.updated_at = data.updated_at;
   return data;
 }
 export async function newBezCN() {
@@ -287,11 +305,11 @@ export async function createInvoice(row) {
     if (error.code !== '23505' || i >= 3) throw error;
   }
 }
-export async function saveInvoice(i) {
+export async function saveInvoice(i, force = false) {
   const row = { number: i.number, issued_on: i.issued_on, due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
     customer_ids: i.customer_ids, description: i.description, amount: parseNum(i.amount), paid: !!i.paid };
-  const { data, error } = await sb.from('invoices').update(row).eq('id', i.id).select().single();
-  if (error) throw error;
+  const data = await guardedUpdate('invoices', row, i.id, i.updated_at, force);
+  i.updated_at = data.updated_at;
   return data;
 }
 export async function deleteInvoice(id) {

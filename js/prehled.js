@@ -17,7 +17,7 @@ export async function prehledView(root) {
   const row = (q) => h('tr', null,
     h('td', { class: 'click', onclick: () => { location.hash = (q.settlement && q.settlement.bez ? '#/vyuctovani/' : '#/nabidka/') + q.id; }, style: { cursor: 'pointer' } }, h('b', null, q.number)),
     h('td', null, q.customer_name || '—'), h('td', null, q.project),
-    h('td', null, h('select', { onchange: async (e) => { q.status = e.target.value; try { await saveQuote(q); toast('Stav uložen'); prehledView(root); } catch (er) { toast(er.message, 'err'); } } },
+    h('td', null, h('select', { onchange: async (e) => { q.status = e.target.value; try { await saveQuote(q); toast('Stav uložen'); prehledView(root); } catch (er) { toast(er.conflict ? 'Zakázku mezitím upravil někdo jiný – načítám novou verzi.' : er.message, 'err'); if (er.conflict) prehledView(root); } } },
       STAV.map((s) => h('option', { selected: s === q.status }, s)))),
     h('td', { class: 'r' }, kc(amount(q))));
   const table = (rows) => h('div', { class: 'tablewrap' }, h('table', { class: 't' },

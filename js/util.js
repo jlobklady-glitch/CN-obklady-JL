@@ -92,3 +92,19 @@ export function confirmBox(text) {
 export function uid() {
   return (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2) + Date.now().toString(36));
 }
+
+// Dialog při souběžné úpravě: vrací 'reload' (načíst novou verzi) nebo 'overwrite' (přepsat mou verzí)
+export function conflictBox(what) {
+  return new Promise((resolve) => {
+    const done = (v) => { overlay.remove(); resolve(v); };
+    const overlay = h('div', { class: 'overlay' },
+      h('div', { class: 'dialog' },
+        h('h2', null, 'Souběžná úprava'),
+        h('p', null, `${what} mezitím upravil někdo jiný (Lukáš nebo Honza). Co chcete udělat?`),
+        h('p', { class: 'muted' }, 'Načtením nové verze se vaše poslední změny zahodí. Přepsáním se zahodí změny druhé osoby.'),
+        h('div', { class: 'row end' },
+          h('button', { class: 'btn ghost', onclick: () => done('overwrite') }, 'Přepsat mou verzí'),
+          h('button', { class: 'btn gold', onclick: () => done('reload') }, 'Načíst novou verzi'))));
+    document.body.append(overlay);
+  });
+}
