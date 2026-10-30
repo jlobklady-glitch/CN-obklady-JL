@@ -1,5 +1,5 @@
 // Service worker: síť má přednost (nová verze se načte hned po připojení), offline se bere z mezipaměti.
-const CACHE = 'jl-obklady-v1';
+const CACHE = 'jl-obklady-v2';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/main.js', 'vendor/supabase.js', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -21,7 +21,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // Supabase a ostatní se necachuje
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
