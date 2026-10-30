@@ -43,9 +43,12 @@ export function itemsEditor(items, onTouch) {
     recalc();
   };
   const row = (r, i) => {
-    const tot = h('div', { class: 'tot c-tot' }, kc(lineTotal(r)));
+    const tot = h('div', { class: 'tot c-tot', 'data-l': 'Celkem' }, kc(lineTotal(r)));
     const upd = () => { tot.textContent = kc(lineTotal(r)); recalc(); onTouch(); };
-    const nameIn = h('input', { type: 'text', value: r.name, placeholder: 'Začněte psát název položky…', oninput: (e) => { r.name = e.target.value; r.item_id = null; upd(); } });
+    const grow = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
+    const nameIn = h('textarea', { rows: 1, class: 'nm', value: r.name, placeholder: 'Začněte psát název položky…', oninput: (e) => { grow(e.target); r.name = e.target.value; r.item_id = null; upd(); },
+      onkeydown: (e) => { if (e.key === 'Enter') e.preventDefault(); } });
+    requestAnimationFrame(() => grow(nameIn));
     const unitIn = h('input', { type: 'text', value: r.unit, oninput: (e) => { r.unit = e.target.value; onTouch(); } });
     const priceIn = h('input', { type: 'text', inputmode: 'decimal', class: 'num', value: r.price ?? '', oninput: (e) => { r.price = parseNum(e.target.value); upd(); } });
     const typSel = h('select', { onchange: (e) => { r.typ = typeKey(e.target.value); onTouch(); } }, TYPES.map((t) => h('option', { selected: t.key === r.typ }, t.label)));
@@ -58,15 +61,15 @@ export function itemsEditor(items, onTouch) {
     const sug = suggestBox(nameIn, (p) => {
       r.item_id = p.id; r.name = displayName(p); r.unit = displayUnit(p); r.typ = p.category;
       r.qty = r.qty || 1; r.price = priceFor(p, r.qty);
-      nameIn.value = r.name; unitIn.value = r.unit; priceIn.value = r.price; qtyIn.value = r.qty;
+      nameIn.value = r.name; grow(nameIn); unitIn.value = r.unit; priceIn.value = r.price; qtyIn.value = r.qty;
       [...typSel.options].forEach((o) => { o.selected = o.text === typeLabel(r.typ); });
       upd();
     });
-    return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug), h('div', { class: 'c-mj' }, unitIn),
-      h('div', { class: 'c-qty' }, qtyIn), h('div', { class: 'c-price' }, priceIn), h('div', { class: 'c-disc' }, discIn), tot,
+    return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug), h('div', { class: 'c-mj', 'data-l': 'MJ' }, unitIn),
+      h('div', { class: 'c-qty', 'data-l': 'Množství' }, qtyIn), h('div', { class: 'c-price', 'data-l': 'Cena / MJ' }, priceIn), h('div', { class: 'c-disc', 'data-l': 'Sleva %' }, discIn), tot,
       h('div', { class: 'c-del' }, h('button', { class: 'del', title: 'Smazat řádek', onclick: () => { items.splice(i, 1); draw(); onTouch(); } }, '×')));
   };
-  const add = () => { items.push({ typ: 'prace', name: '', unit: '', qty: '', price: '', disc: 0 }); draw(); box.lastChild.querySelector('input[type=text]:not([inputmode])')?.focus(); };
+  const add = () => { items.push({ typ: 'prace', name: '', unit: '', qty: '', price: '', disc: 0 }); draw(); box.lastChild.querySelector('textarea')?.focus(); };
   draw();
   return { box, totalV, add, redraw: draw };
 }
