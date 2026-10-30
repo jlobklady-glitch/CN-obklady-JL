@@ -33,15 +33,32 @@ function loginView(msg) {
 
 const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
+function stackAll(el) {
+  el.querySelectorAll('table.t').forEach((t) => {
+    const heads = [...t.querySelectorAll('thead th')].map((x) => x.textContent);
+    if (!heads.length) return;
+    t.classList.add('stack');
+    t.querySelectorAll('tbody tr').forEach((tr) => [...tr.children].forEach((td, i) => { if (heads[i] && !td.dataset.label) td.dataset.label = heads[i]; }));
+  });
+}
+let stackObs;
 async function route() {
   if (!S.user) return;
   if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; }
   const hash = location.hash || '#/prehled';
   const main = h('main');
-  const bar = h('div', { class: 'topbar' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION)), h('div', { class: 'grow' }),
-    h('nav', { class: 'tabs' }, TABS.map(([href, l]) => h('a', { href, class: hash.startsWith(href) || (href === '#/nabidky' && hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')) ? 'active' : '' }, l)),
-      h('a', { href: '#', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
-  app.replaceChildren(h('div', { class: 'shell' }, bar, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
+  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')));
+  const close = () => { drawer.classList.remove('open'); scrim.classList.remove('open'); };
+  const scrim = h('div', { class: 'scrim', onclick: close });
+  const drawer = h('aside', { class: 'drawer' },
+    h('div', { class: 'drawer-head' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION))),
+    h('nav', null, TABS.map(([href, l]) => h('a', { href, class: isActive(href) ? 'active' : '', onclick: close }, l)),
+      h('a', { href: '#', class: 'out', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
+  const bar = h('div', { class: 'topbar' },
+    h('button', { class: 'burger', 'aria-label': 'Menu', onclick: () => { drawer.classList.add('open'); scrim.classList.add('open'); } }, h('span'), h('span'), h('span')),
+    h('div', { class: 'brand' }, (TABS.find(([href]) => isActive(href)) || ['', 'JL-OBKLADY'])[1]), h('div', { class: 'grow' }), h('div', { class: 'brand logo' }, 'JL-OBKLADY'));
+  app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
+  stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);

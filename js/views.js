@@ -47,25 +47,34 @@ export function contactsView(root) {
 export function pricesView(root) {
   let cat = 'prace', q = '';
   const body = h('div');
-  const LIMIT = 100;
+  const LIMIT = 60;
+  const grow = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
   const draw = () => {
     const m = matcher(q);
     const all = S.prices.filter((p) => p.category === cat && (!q || m(`${p.code} ${p.name}`)));
     const rows = all.slice(0, LIMIT);
-    const cell = (p, k, cls) => h('td', null, h('input', { type: 'text', class: cls || '', value: p[k] ?? '', onchange: async (e) => {
-      p[k] = (k === 'price' || k === 'pack') ? parseNum(e.target.value) : e.target.value;
-      try { await savePrice(p); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); } } }));
+    const save = async (p, k, v) => {
+      p[k] = (k === 'price' || k === 'pack') ? parseNum(v) : v;
+      try { await savePrice(p); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); }
+    };
+    const small = (p, k, label, cls) => h('div', { class: 'pf ' + (cls || '') }, h('label', { class: 'f' }, label),
+      h('input', { type: 'text', inputmode: (k === 'price' || k === 'pack') ? 'decimal' : 'text', value: p[k] ?? '', onchange: (e) => save(p, k, e.target.value) }));
+    const card = (p) => {
+      const ta = h('textarea', { rows: 1, onchange: (e) => save(p, 'name', e.target.value), oninput: (e) => grow(e.target) }, p.name);
+      requestAnimationFrame(() => grow(ta));
+      return h('div', { class: 'pr' },
+        h('div', { class: 'pf pn' }, h('label', { class: 'f' }, 'Název'), ta),
+        h('div', { class: 'pr-small' }, small(p, 'code', 'Kód'), small(p, 'unit', 'MJ'), cat === 'mapei' ? small(p, 'pack', 'Balení') : null, small(p, 'price', 'Cena (Kč)'),
+          h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); draw(); } } }, '×')));
+    };
     body.replaceChildren(
       h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
-      h('div', { class: 'tablewrap' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['Kód', 'Název', 'MJ', cat === 'mapei' ? 'Balení' : null, 'Cena', ''].filter((x) => x !== null).map((t) => h('th', null, t)))),
-        h('tbody', null, rows.map((p) => h('tr', null, cell(p, 'code'), cell(p, 'name'), cell(p, 'unit'), cat === 'mapei' ? cell(p, 'pack', 'num') : null, cell(p, 'price', 'num'),
-          h('td', null, h('button', { class: 'del', style: { background: 'none', border: 0, color: 'var(--bad)', fontSize: '18px', cursor: 'pointer' }, onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); draw(); } } }, '×'))))))));
+      h('div', { class: 'prlist' }, rows.map(card)));
   };
-  const tabs = h('div', { class: 'row', style: { marginBottom: '10px' } }, TYPES.map((t) => h('button', { class: 'btn small ' + (t.key === cat ? '' : 'ghost'), onclick: (e) => { cat = t.key; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); draw(); } }, t.label)));
+  const tabs = h('div', { class: 'tabsrow' }, TYPES.map((t) => h('button', { class: 'btn small ' + (t.key === cat ? '' : 'ghost'), onclick: (e) => { cat = t.key; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); draw(); } }, t.label)));
   root.replaceChildren(
-    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => { try { await savePrice({ category: cat, name: 'Nová položka', price: 0 }); q = ''; draw(); toast('Položka přidána'); } catch (e) { toast(e.message, 'err'); } } }, '+ Nová položka')),
-    tabs, h('div', { class: 'row', style: { marginBottom: '10px' } }, h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } })),
+    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => { try { await savePrice({ category: cat, name: 'Nová položka', price: 0 }); q = ''; draw(); toast('Položka přidána – je na konci seznamu'); } catch (e) { toast(e.message, 'err'); } } }, '+ Nová položka')),
+    tabs, h('div', { style: { margin: '10px 0' } }, h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } })),
     body);
   draw();
 }
