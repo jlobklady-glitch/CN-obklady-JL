@@ -80,7 +80,10 @@ export function pricesView(root) {
 }
 
 export function settingsView(root) {
-  const f = { ...S.firma };
+  const f = JSON.parse(JSON.stringify(S.firmaBase));
+  f.profiles = f.profiles || {};
+  const P = (f.profiles[S.profile] = f.profiles[S.profile] || {});
+  const pinp = (k) => h('input', { type: 'text', value: P[k] ?? '', oninput: (e) => { P[k] = e.target.value; } });
   const inp = (k, type = 'text') => h('input', { type, value: f[k] ?? '', oninput: (e) => { f[k] = type === 'number' ? parseNum(e.target.value) : e.target.value; } });
   const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
   f.workers = f.workers && f.workers.length ? f.workers : ['Lukáš', 'Honza', 'Firma (JL-OBKLADY)'];
@@ -94,9 +97,9 @@ export function settingsView(root) {
   const imp = h('div', { class: 'muted' });
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Nastavení')),
-    h('div', { class: 'card' }, h('h2', null, 'Firma (dodavatel)'), h('div', { class: 'grid c2' },
-      fld('Jméno / název', inp('name')), fld('IČO', inp('ico')), fld('Adresa', inp('address'), 'span2'),
-      fld('Telefon', inp('phone')), fld('E-mail', inp('email')), fld('Číslo účtu', inp('account')), fld('Banka', inp('bank')),
+    h('div', { class: 'card' }, h('h2', null, 'Dodavatel – profil: ' + (P.label || S.profile)), h('div', { class: 'grid c2' },
+      fld('Jméno / název', pinp('name')), fld('IČO', pinp('ico')), fld('Adresa', pinp('address'), 'span2'),
+      fld('Telefon', pinp('phone')), fld('E-mail', pinp('email')), fld('Číslo účtu', pinp('account')), fld('Banka', pinp('bank')),
       fld('Instagram (odkaz)', inp('instagram')), fld('YouTube (odkaz)', inp('youtube')), fld('Slogan v záhlaví', inp('tagline'), 'span2'),
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
       fld('Sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),

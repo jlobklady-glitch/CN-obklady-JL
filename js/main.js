@@ -1,5 +1,5 @@
 import { h, toast } from './util.js';
-import { sb, S, loadAll } from './store.js';
+import { sb, S, loadAll, profileList, setProfile } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
@@ -34,6 +34,12 @@ function loginView(msg) {
     h('div', { class: 'card' }, h('div', { class: 'grid' }, email, pass, h('button', { class: 'btn gold', onclick: go }, 'Přihlásit')), err)));
 }
 
+function profilePicker(then) {
+  app.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'logo' }, 'Kdo jste?', h('small', null, 'VYBERTE SVŮJ PROFIL')),
+    h('div', { class: 'card' }, h('div', { class: 'grid' }, profileList().map((p) => h('button', { class: 'btn gold', style: { fontSize: '18px', padding: '16px' }, onclick: () => { setProfile(p.key); then(); } }, p.label))),
+      h('p', { class: 'muted' }, 'Profil mění jen údaje dodavatele v záhlaví nabídek a faktur. Data jsou společná. Profil lze kdykoli změnit v menu.'))));
+}
+
 const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 function stackAll(el) {
@@ -56,10 +62,11 @@ async function route() {
   const drawer = h('aside', { class: 'drawer' },
     h('div', { class: 'drawer-head' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION))),
     h('nav', null, TABS.map(([href, l]) => h('a', { href, class: isActive(href) ? 'active' : '', onclick: close }, l)),
+      h('a', { href: '#', onclick: (e) => { e.preventDefault(); close(); profilePicker(() => route()); } }, 'Profil: ' + ((S.firmaBase.profiles || {})[S.profile] || {}).label + ' (změnit)'),
       h('a', { href: '#', class: 'out', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
   const bar = h('div', { class: 'topbar' },
     h('button', { class: 'burger', 'aria-label': 'Menu', onclick: () => { drawer.classList.add('open'); scrim.classList.add('open'); } }, h('span'), h('span'), h('span')),
-    h('div', { class: 'brand' }, (TABS.find(([href]) => isActive(href)) || ['', 'JL-OBKLADY'])[1]), h('div', { class: 'grow' }), h('div', { class: 'brand logo' }, 'JL-OBKLADY'));
+    h('div', { class: 'brand' }, (TABS.find(([href]) => isActive(href)) || ['', 'JL-OBKLADY'])[1]), h('div', { class: 'grow' }), h('div', { class: 'brand logo' }, ((S.firmaBase.profiles || {})[S.profile] || {}).label || 'JL-OBKLADY'));
   app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
   stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
@@ -83,6 +90,7 @@ async function boot() {
   S.user = data.session.user;
   app.replaceChildren(h('p', { class: 'muted', style: { padding: '20px' } }, 'Načítám data…'));
   try { await loadAll(); } catch (e) { return loginView('Data se nepodařilo načíst: ' + e.message); }
+  if (!S.profile && profileList().length) return profilePicker(() => route());
   route();
 }
 window.addEventListener('hashchange', route);

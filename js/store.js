@@ -27,7 +27,27 @@ export const DEFAULT_FIRMA = {
   tagline: 'OBKLADY  ·  DLAŽBY  ·  KOUPELNY  ·  DEKORATIVNÍ STĚRKY',
 };
 
-export const S = { user: null, firma: { ...DEFAULT_FIRMA }, contacts: [], prices: [], loaded: false };
+export const S = { user: null, firma: { ...DEFAULT_FIRMA }, firmaBase: { ...DEFAULT_FIRMA }, profile: null, contacts: [], prices: [], loaded: false };
+
+// Profil = kdo je právě přihlášený (Lukáš / Honza). Mění jen údaje dodavatele v záhlaví dokumentů, data jsou společná.
+const PROFILE_KEY = 'jl-profile';
+export const profileList = () => Object.entries(S.firmaBase.profiles || {}).map(([key, p]) => ({ key, label: p.label || key }));
+export function applyProfile() {
+  const b = S.firmaBase;
+  S.firma = { ...b, ...((b.profiles || {})[S.profile] || {}) };
+}
+export function readProfile() {
+  let k = null;
+  try { k = localStorage.getItem(PROFILE_KEY); } catch (_) { /* nic */ }
+  S.profile = k && (S.firmaBase.profiles || {})[k] ? k : null;
+  applyProfile();
+  return S.profile;
+}
+export function setProfile(k) {
+  S.profile = k;
+  try { localStorage.setItem(PROFILE_KEY, k); } catch (_) { /* nic */ }
+  applyProfile();
+}
 
 const CACHE_KEY = 'jl-cache-v1';
 
@@ -51,17 +71,18 @@ export async function loadAll() {
       fetchAll('settings'), fetchAll('contacts', 'name'), fetchAll('price_items', 'name'),
     ]);
     const f = settings.find((r) => r.key === 'firma');
-    S.firma = { ...DEFAULT_FIRMA, ...(f ? f.value : {}) };
+    S.firmaBase = { ...DEFAULT_FIRMA, ...(f ? f.value : {}) };
+    readProfile();
     S.contacts = contacts;
     S.prices = prices;
     S.loaded = true;
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ firma: S.firma, contacts, prices })); } catch (_) { /* plná paměť */ }
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ firma: S.firmaBase, contacts, prices })); } catch (_) { /* plná paměť */ }
     return true;
   } catch (e) {
     // offline: poslední načtená data
     try {
       const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-      if (c) { S.firma = c.firma; S.contacts = c.contacts; S.prices = c.prices; S.loaded = true; S.offline = true; return true; }
+      if (c) { S.firmaBase = c.firma; readProfile(); S.contacts = c.contacts; S.prices = c.prices; S.loaded = true; S.offline = true; return true; }
     } catch (_) { /* nic */ }
     throw e;
   }
@@ -70,7 +91,8 @@ export async function loadAll() {
 export async function saveFirma(value) {
   const { error } = await sb.from('settings').upsert({ key: 'firma', value });
   if (error) throw error;
-  S.firma = { ...DEFAULT_FIRMA, ...value };
+  S.firmaBase = { ...DEFAULT_FIRMA, ...value };
+  applyProfile();
 }
 
 // ---------- kontakty ----------
