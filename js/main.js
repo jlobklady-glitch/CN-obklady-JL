@@ -5,6 +5,7 @@ import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
 import { prehledView } from './prehled.js';
+import { orderView } from './objednavka.js';
 import { ziskView } from './ziskovost.js';
 import { skladView } from './sklad.js';
 import { hodinyView } from './hodiny.js';
@@ -73,7 +74,7 @@ async function route() {
   const hash = location.hash || '#/prehled';
   lastHash = hash;
   const main = h('main');
-  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')));
+  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/objednavka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')));
   const close = () => { drawer.classList.remove('open'); scrim.classList.remove('open'); };
   const scrim = h('div', { class: 'scrim', onclick: close });
   const drawer = h('aside', { class: 'drawer' },
@@ -93,6 +94,7 @@ async function route() {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/objednavka/')) await orderView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/zisk')) await ziskView(main);
     else if (hash.startsWith('#/sklad')) await skladView(main);
     else if (hash.startsWith('#/hodiny')) await hodinyView(main);

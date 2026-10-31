@@ -96,6 +96,7 @@ export async function quoteEditor(root, id) {
       h('a', { href: '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, q.number), state,
       h('button', { class: 'btn ghost small', onclick: showPreview }, 'Náhled'),
+      h('a', { href: '#/objednavka/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Objednávka'),
       h('a', { href: '#/vyuctovani/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Vyúčtování'),
       h('button', { class: 'btn ghost small', onclick: async (e) => { await saver.flush(); savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(quoteDoc(q)); } }, 'PDF / Tisk')),

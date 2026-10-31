@@ -152,3 +152,17 @@ function premiumPage(q, base) {
     <div class="band" style="margin-top:6mm">NEJČASTĚJŠÍ OTÁZKY – PROČ SE PREMIUM VYPLATÍ</div>
     ${qa.map((x) => `<div class="keep" style="margin-top:3mm"><div style="font-weight:800;font-size:10pt">${esc(x.q)}</div><div style="font-size:9pt;margin-top:.8mm">${esc(x.a)}</div></div>`).join('')}`;
 }
+
+// ---------- objednávka materiálu pro dodavatele ----------
+export function orderDoc(o) {
+  F = firmaFor(o.quote || {});
+  const f = F;
+  const rows = (o.rows || []).filter((r) => r.name).map((r, i) => `<tr><td class="c">${i + 1}</td><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td class="c">${num(r.qty)}</td><td class="c">${esc(r.unit)}</td><td class="typ">${esc(r.note)}</td></tr>`).join('');
+  return `<div class="doc">${headBar('OBJEDNÁVKA MATERIÁLU')}
+    <div class="parties"><div class="sup"><div class="lab">Dodavatel / stavebniny</div><b>${esc(o.supplier || '')}</b></div>
+      <div class="cus"><div class="lab">Odběratel</div><b>${esc(f.name)}</b><div>${esc(f.address)}</div><div>IČO: ${esc(f.ico)}</div><div>${esc(f.email)} · ${esc(f.phone)}</div></div></div>
+    <div class="boxes"><div><div class="bl">Zakázka</div><div class="bv" style="font-size:10pt">${esc(o.quote ? o.quote.number : '')}${o.quote && o.quote.customer_name ? ' – ' + esc(o.quote.customer_name) : ''}</div></div>
+      <div><div class="bl">Datum</div><div class="bv">${fmtDate(isoToday())}</div></div><div></div></div>
+    <table class="dt"><thead><tr><th>#</th><th class="l">KÓD</th><th class="l">NÁZEV PRODUKTU</th><th>MNOŽSTVÍ</th><th>JEDNOTKA</th><th class="l">POZNÁMKA</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="keep"><div class="lab" style="margin-top:3mm">Poznámka k objednávce</div><div class="notebox">${esc(o.note)}</div>${footer()}</div></div>`;
+}
