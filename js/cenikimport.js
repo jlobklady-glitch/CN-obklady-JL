@@ -123,7 +123,7 @@ const NO_PREFIX = new Set(['prace', 'ostatni', 'obklad (stena)', 'dlazba (podlah
 
 async function readWorkbook(file) {
   const X = await loadXlsx();
-  const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+  const wb = X.read(file instanceof ArrayBuffer ? file : await file.arrayBuffer(), { type: 'array' });
   return wb.SheetNames.map((n) => ({ name: n, rows: X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }) }));
 }
 export function parsePrace(sheets) {
@@ -250,7 +250,16 @@ export function importButtons(cat, done) {
         showPracePlan(planPrace(inc), done);
       } catch (er) { toast(er.message || String(er), 'err'); }
     } });
+    const bundled = h('button', { class: 'btn gold small', onclick: async () => {
+      try {
+        toast('Načítám ceník z aplikace…');
+        const r = await fetch('data/cenik-praci-2026.xlsx', { cache: 'no-cache' }); if (!r.ok) throw new Error('Ceník v aplikaci se nepodařilo načíst.');
+        showPracePlan(planPrace(parsePrace(await readWorkbook(await r.arrayBuffer()))), done);
+      } catch (er) { toast(er.message || String(er), 'err'); }
+    } }, 'Načíst ceník prací 2026 (z aplikace)');
+    const already = S.prices.some((p) => p.code === 'PRI-001');
     return h('span', { style: { display: 'inline-flex', gap: '6px', flexWrap: 'wrap' } },
+      already ? null : bundled,
       h('button', { class: 'btn ghost small', onclick: () => file.click() }, 'Import ze souboru'),
       h('button', { class: 'btn ghost small', onclick: async () => {
         const X = await loadXlsx(); const wb = X.utils.book_new(); const ex = praceExportRows();
