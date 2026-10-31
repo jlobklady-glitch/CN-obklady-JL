@@ -2,6 +2,7 @@
 import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
+import { importButtons } from './cenikimport.js';
 import { saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
@@ -70,7 +71,8 @@ export function pricesView(root) {
           h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); draw(); } } }, '×')));
     };
     body.replaceChildren(
-      h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
+      (cat === 'mapei' || cat === 'kabe') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(cat, draw)) : null,
+    h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
       h('div', { class: 'prlist' }, rows.map(card)));
   };
   const searchIn = h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } });
