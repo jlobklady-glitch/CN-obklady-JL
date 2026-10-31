@@ -2,7 +2,7 @@
 import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
-import { S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
+import { saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
   let q = '';
@@ -73,16 +73,18 @@ export function pricesView(root) {
       h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
       h('div', { class: 'prlist' }, rows.map(card)));
   };
+  const searchIn = h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } });
   const tabs = h('div', { class: 'tabsrow' }, TYPES.map((t) => h('button', { class: 'btn small ' + (t.key === cat ? '' : 'ghost'), onclick: (e) => { cat = t.key; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); draw(); } }, t.label)));
   root.replaceChildren(
-    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => { try { await savePrice({ category: cat, name: 'Nová položka', price: 0 }); q = ''; draw(); toast('Položka přidána – je na konci seznamu'); } catch (e) { toast(e.message, 'err'); } } }, '+ Nová položka')),
-    tabs, h('div', { style: { margin: '10px 0' } }, h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } })),
+    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => { try { await savePrice({ category: cat, name: 'Nová položka', price: 0 }); q = 'Nová položka'; searchIn.value = q; draw(); toast('Položka přidána – je na konci seznamu'); } catch (e) { toast(e.message, 'err'); } } }, '+ Nová položka')),
+    tabs, h('div', { style: { margin: '10px 0' } }, searchIn),
     body);
   draw();
 }
 
 export function settingsView(root) {
   const f = JSON.parse(JSON.stringify(S.firmaBase));
+  let orig = JSON.parse(JSON.stringify(S.firmaBase));
   f.profiles = f.profiles || {};
   const P = (f.profiles[S.profile] = f.profiles[S.profile] || {});
   const pinp = (k) => h('input', { type: 'text', value: P[k] ?? '', oninput: (e) => { P[k] = e.target.value; } });
@@ -97,6 +99,12 @@ export function settingsView(root) {
     h('input', { type: 'text', value: w, oninput: (e) => { const old = f.workers[i]; f.workers[i] = e.target.value; if (f.rates[old] !== undefined) { f.rates[e.target.value] = f.rates[old]; delete f.rates[old]; } } }),
     h('label', { class: 'f', style: { marginTop: '6px' } }, 'Sazba (Kč/hod)'),
     h('input', { type: 'text', inputmode: 'decimal', value: f.rates[w] ?? '', oninput: (e) => { f.rates[f.workers[i]] = parseNum(e.target.value); } }))));
+  const saveSettings = async () => {
+    for (const k of ['mapei_discount', 'kabe_markup']) { // 28 → 0,28 (zadáno v procentech)
+      let x = Number(f[k]) || 0; if (x > 1) x /= 100; f[k] = Math.min(Math.max(x, 0), 1);
+    }
+    try { await saveFirmaMerged(orig, f); orig = JSON.parse(JSON.stringify(f)); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); }
+  };
   const pw = h('input', { type: 'password', placeholder: 'Nové heslo (min. 8 znaků)' });
   const imp = h('div', { class: 'muted' });
   const bk = h('div', { class: 'muted', style: { marginTop: '8px' } });
@@ -109,16 +117,16 @@ export function settingsView(root) {
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
       fld('Sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
       fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; } }, f.terms || ''), 'span2')),
-      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: async () => { try { await saveFirma(f); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); } } }, 'Uložit'))),
+      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Pracovníci a hodinové sazby'), workersBox,
-      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: async () => { try { await saveFirma(f); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); } } }, 'Uložit'))),
+      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Premium – otázky a odpovědi (strana 2 nabídky)'),
       h('p', { class: 'muted' }, 'Do nabídky se vypíšou jen řádky se zaškrtnutým „Zobrazit“, v pořadí odshora. Odpověď držte do cca 450 znaků.'),
       f.qa.map((x, i) => h('div', { class: 'rc', style: { marginBottom: '8px' } }, h('div', { class: 'grid' },
         h('div', null, h('label', { class: 'f' }, 'Otázka ' + (i + 1)), h('input', { type: 'text', value: x.q, oninput: (e) => { x.q = e.target.value; } })),
         h('div', null, h('label', { class: 'f' }, 'Odpověď'), h('textarea', { rows: 3, oninput: (e) => { x.a = e.target.value; } }, x.a)),
         h('label', { class: 'row' }, h('input', { type: 'checkbox', style: { width: 'auto' }, checked: !!x.show, onchange: (e) => { x.show = e.target.checked; } }), 'Zobrazit v nabídce')))),
-      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: async () => { try { await saveFirma(f); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); } } }, 'Uložit'))),
+      h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Heslo'), h('div', { class: 'row' }, h('div', { class: 'grow' }, pw),
       h('button', { class: 'btn', onclick: async () => {
         if (pw.value.length < 8) return toast('Heslo musí mít alespoň 8 znaků', 'err');

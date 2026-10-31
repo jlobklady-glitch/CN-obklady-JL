@@ -16,7 +16,8 @@ export async function hodinyView(root) {
   const rowRate = (r) => (r.data.rate !== undefined && r.data.rate !== '' ? n(r.data.rate) : rateOf(r.data.worker));
   const drawSum = () => {
     const stock = stockCalc().byPayer;
-    const rows = PAYERS().map((w) => {
+    const names = [...new Set([...PAYERS(), ...(S.rec.hours || []).map((r) => r.data.worker), ...(S.rec.cost || []).map((r) => r.data.payer), ...Object.keys(stock)].filter(Boolean))];
+    const rows = names.map((w) => {
       const hrs = (S.rec.hours || []).filter((r) => r.data.worker === w);
       const h_ = hrs.reduce((t, r) => t + n(r.data.hours), 0);
       const mzda = hrs.reduce((t, r) => t + n(r.data.hours) * rowRate(r), 0);

@@ -17,7 +17,12 @@ const app = document.getElementById('app');
 if ('serviceWorker' in navigator) {
   const had = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then((r) => { setInterval(() => r.update().catch(() => {}), 5 * 60 * 1000); }).catch(() => {});
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had) location.reload(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!had) return;
+    // nové verze se nenačítají uprostřed psaní: nejdřív se uloží rozpracované změny
+    const go = () => location.reload();
+    if (window.__isDirty && window.__isDirty()) { window.__flushSave().then(go, go); } else go();
+  });
 }
 
 function loginView(msg) {
@@ -51,11 +56,21 @@ function stackAll(el) {
     t.querySelectorAll('tbody tr').forEach((tr) => [...tr.children].forEach((td, i) => { if (heads[i] && !td.dataset.label) td.dataset.label = heads[i]; }));
   });
 }
-let stackObs;
+let stackObs, lastHash = '';
 async function route() {
   if (!S.user) return;
-  if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; }
+  if (window.__flushSave) {
+    let ok = true;
+    try { ok = await window.__flushSave(); } catch (_) { ok = false; }
+    if (ok === false) { // uložení selhalo – zůstat na stránce, ať se změny neztratí
+      toast('Změny se nepodařilo uložit – zůstáváte na stránce.', 'err');
+      if (lastHash && location.hash !== lastHash) history.replaceState(null, '', lastHash);
+      return;
+    }
+    window.__flushSave = null; window.__isDirty = null;
+  }
   const hash = location.hash || '#/prehled';
+  lastHash = hash;
   const main = h('main');
   const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')));
   const close = () => { drawer.classList.remove('open'); scrim.classList.remove('open'); };
@@ -64,7 +79,7 @@ async function route() {
     h('div', { class: 'drawer-head' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION))),
     h('nav', null, TABS.map(([href, l]) => h('a', { href, class: isActive(href) ? 'active' : '', onclick: close }, l)),
       h('a', { href: '#', onclick: (e) => { e.preventDefault(); close(); profilePicker(() => route()); } }, 'Profil: ' + ((S.firmaBase.profiles || {})[S.profile] || {}).label + ' (změnit)'),
-      h('a', { href: '#', class: 'out', onclick: async (e) => { e.preventDefault(); await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
+      h('a', { href: '#', class: 'out', onclick: async (e) => { e.preventDefault(); if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; window.__isDirty = null; } await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
   const bar = h('div', { class: 'topbar' },
     h('button', { class: 'burger', 'aria-label': 'Menu', onclick: () => { drawer.classList.add('open'); scrim.classList.add('open'); } }, h('span'), h('span'), h('span')),
     h('div', { class: 'brand' }, (TABS.find(([href]) => isActive(href)) || ['', 'JL-OBKLADY'])[1]), h('div', { class: 'grow' }), h('div', { class: 'brand logo' }, ((S.firmaBase.profiles || {})[S.profile] || {}).label || 'JL-OBKLADY'));
@@ -100,5 +115,6 @@ async function boot() {
 window.addEventListener('hashchange', route);
 // rozpracovaná úprava se uloží i při přepnutí aplikace / zavření karty
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && window.__flushSave) window.__flushSave().catch(() => {}); });
+window.addEventListener('beforeunload', (e) => { if (window.__isDirty && window.__isDirty()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('pagehide', () => { if (window.__flushSave) window.__flushSave().catch(() => {}); });
 boot();

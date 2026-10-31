@@ -1,5 +1,5 @@
 // Finální vyúčtování (k nabídce nebo bez CN) a faktury.
-import { h, kc, fmtDate, debounce, toast, confirmBox, conflictBox, parseNum, isoToday, addDays } from './util.js';
+import { h, kc, fmtDate, toast, confirmBox, makeSaver, parseNum, isoToday, addDays } from './util.js';
 import { S, getQuote, saveQuote, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
@@ -7,23 +7,6 @@ import { settlementDoc, settlementTotals, invoiceDoc, printDoc } from './doc.js'
 
 const put = (root, ...c) => root.replaceChildren(...c.filter(Boolean));
 
-// Uložení s ošetřením souběžné úpravy; vrací funkci doSave(force)
-function makeSaver(save, what, state, setDirty) {
-  let resolving = false;
-  const doSave = async (force = false) => {
-    if (resolving) return;
-    try { await save(force === true); setDirty(false); state.textContent = 'Uloženo'; state.className = 'savestate'; }
-    catch (e) {
-      if (e.conflict) {
-        resolving = true; const c = await conflictBox(what); resolving = false;
-        if (c === 'reload') { setDirty(false); window.__flushSave = null; return location.reload(); }
-        return doSave(true);
-      }
-      state.textContent = 'Chyba ukládání'; toast('Nepodařilo se uložit: ' + e.message, 'err');
-    }
-  };
-  return doSave;
-}
 const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
 
 export async function settlementEditor(root, id) {
@@ -32,9 +15,7 @@ export async function settlementEditor(root, id) {
   const st = q.settlement = q.settlement && q.settlement.items ? q.settlement : { ...(q.settlement || {}), items: JSON.parse(JSON.stringify(q.items || [])), advance: 0, note: '' };
   const bez = !!st.bez;
   const state = h('span', { class: 'savestate' }, 'Uloženo');
-  let dirty = false;
-  const doSave = makeSaver((f) => saveQuote(q, f), 'Toto vyúčtování', state, (d) => { dirty = d; });
-  const autosave = debounce(() => doSave(), 800);
+  const saver = makeSaver((f) => saveQuote(q, f), 'Toto vyúčtování', state);
   const sums = h('div', { class: 'card' });
   const drawSums = () => {
     const t = settlementTotals(q);
@@ -42,8 +23,8 @@ export async function settlementEditor(root, id) {
     sums.replaceChildren(!bez && line(`Celkem dle nabídky ${q.number}`, kc(t.offer)), !bez && line('Rozdíl oproti nabídce', kc(t.diff)),
       line('Celkem skutečně', kc(t.actual), true), t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true));
   };
-  const touch = () => { dirty = true; state.textContent = 'Ukládám…'; state.className = 'savestate dirty'; autosave(); drawSums(); };
-  window.__flushSave = async () => { if (dirty) await autosave.flush(); };
+  const touch = () => { saver.touch(); drawSums(); };
+  window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;
   const ed = itemsEditor(st.items, touch);
   const bind = (obj, k, num) => (e) => { obj[k] = num ? parseNum(e.target.value) : e.target.value; touch(); };
 
@@ -66,10 +47,10 @@ export async function settlementEditor(root, id) {
       list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', null, list.map((i) => h('tr', { class: 'click', onclick: () => { location.hash = '#/faktura/' + i.id; } },
         h('td', null, h('b', null, i.number)), h('td', null, fmtDate(i.issued_on)), h('td', { class: 'r' }, kc(i.amount)), h('td', null, h('span', { class: 'badge ' + (i.paid ? 'ok' : 'gold') }, i.paid ? 'Zaplaceno' : 'Nezaplaceno'))))))) : h('p', { class: 'muted' }, 'Zatím žádná faktura.'),
       h('div', { style: { marginTop: '10px' } }, h('button', { class: 'btn gold', onclick: async () => {
-        await autosave.flush();
+        await saver.flush();
         const t = settlementTotals(q);
         try {
-          const inv = await createInvoice({ quote_id: q.id, issued_on: isoToday(), due_on: addDays(isoToday(), S.firma.due_days || 14),
+          const inv = await createInvoice({ quote_id: q.id, profile: q.profile || S.profile, issued_on: isoToday(), due_on: addDays(isoToday(), S.firma.due_days || 14),
             customer_name: q.customer_name, customer_address: q.customer_address,
             customer_ids: (() => { const c = S.contacts.find((x) => x.id === q.customer_id); return c && c.kind === 'PO' ? [c.ico && 'IČO ' + c.ico, c.dic && 'DIČ ' + c.dic].filter(Boolean).join(', ') : ''; })(),
             description: `${t.advance ? 'Doplatek – ' : ''}${q.project ? q.project : 'Obkladačské práce'}${bez ? '' : ' (dle nabídky ' + q.number + ')'}`, amount: t.due });
@@ -82,8 +63,8 @@ export async function settlementEditor(root, id) {
     h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/nabidky' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
-      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target); } }, 'PDF na Disk'),
-      h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await saver.flush(); savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target); } }, 'PDF na Disk'),
+      h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
     bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
@@ -103,19 +84,17 @@ export async function invoiceEditor(root, id) {
   let inv;
   try { inv = await getInvoice(id); } catch (e) { root.replaceChildren(h('div', { class: 'card' }, 'Faktura nenalezena.')); return; }
   const state = h('span', { class: 'savestate' }, 'Uloženo');
-  let dirty = false;
-  const doSave = makeSaver((f) => saveInvoice(inv, f), 'Tuto fakturu', state, (d) => { dirty = d; });
-  const autosave = debounce(() => doSave(), 800);
+  const isaver = makeSaver((f) => saveInvoice(inv, f), 'Tuto fakturu', state);
   const preview = h('div');
   const draw = () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: invoiceDoc(inv) })); };
-  const touch = () => { dirty = true; state.textContent = 'Ukládám…'; state.className = 'savestate dirty'; autosave(); draw(); };
-  window.__flushSave = async () => { if (dirty) await autosave.flush(); };
+  const touch = () => { isaver.touch(); draw(); };
+  window.__flushSave = isaver.flush; window.__isDirty = isaver.isDirty;
   const bind = (k, num) => (e) => { inv[k] = num ? parseNum(e.target.value) : e.target.value; touch(); };
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Faktura ' + inv.number), state,
-      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target); } }, 'PDF na Disk'),
-      h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await isaver.flush(); savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target); } }, 'PDF na Disk'),
+      h('button', { class: 'btn gold', onclick: async () => { await isaver.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
       fld('Číslo faktury (= variabilní symbol)', h('input', { type: 'text', value: inv.number, oninput: bind('number') })),
@@ -127,7 +106,7 @@ export async function invoiceEditor(root, id) {
       fld('Částka (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: inv.amount, oninput: bind('amount', true) })),
       fld('Stav', h('select', { onchange: (e) => { inv.paid = e.target.value === '1'; touch(); } }, h('option', { value: '0', selected: !inv.paid }, 'Nezaplaceno'), h('option', { value: '1', selected: inv.paid }, 'Zaplaceno'))),
       fld('Popis', h('textarea', { oninput: bind('description') }, inv.description || ''), 'span3'))),
-    h('div', { class: 'row end', style: { marginBottom: '12px' } }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('Smazat fakturu ' + inv.number + '?')) { await deleteInvoice(inv.id); location.hash = inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky'; } } }, 'Smazat')),
+    h('div', { class: 'row end', style: { marginBottom: '12px' } }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('Smazat fakturu ' + inv.number + '?')) { isaver.stop(); window.__flushSave = null; window.__isDirty = null; await deleteInvoice(inv.id); location.hash = inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky'; } } }, 'Smazat')),
     preview);
   draw();
 }

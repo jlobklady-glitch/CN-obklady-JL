@@ -14,9 +14,10 @@ export function stockCalc() {
   outs.forEach((o) => { if (o.data.product) used[o.data.product] = (used[o.data.product] || 0) + n(o.data.qty); });
   const remain = { ...used };
   const rows = [];
+  let missing = 0;
   for (const r of ins) {
     const p = S.prices.find((x) => x.id === r.data.product);
-    if (!p) continue;
+    if (!p) { if (r.data.product || r.data.packs) missing++; continue; }
     const pack = n(p.pack) || 1, packs = n(r.data.packs);
     const delivered = n(r.data.delivered) || packs * pack;
     const pricePack = n(r.data.price_pack) || priceFor(p, 1);
@@ -38,7 +39,7 @@ export function stockCalc() {
     const b = byPayer[r.payer] || (byPayer[r.payer] = { paid: 0, consumed: 0, rest: 0, reimbursed: 0, owed: 0 });
     b.paid += r.value; b.consumed += r.consumedVal; b.rest += r.restVal; b.reimbursed += n(r.rec.data.reimbursed); b.owed += r.owed;
   }
-  return { rows, products: Object.values(products), byPayer };
+  return { rows, products: Object.values(products), byPayer, missing };
 }
 
 export async function skladView(root) {
@@ -51,6 +52,7 @@ export async function skladView(root) {
     const c = stockCalc();
     const prods = c.products.sort((a, b) => displayName(a.p).localeCompare(displayName(b.p), 'cs'));
     sum.replaceChildren(
+      c.missing ? h('div', { class: 'banner' }, `${c.missing} příjmů nemá produkt (smazán z ceníku nebo nevybrán) – do skladu a vyrovnání se nezapočítají.`) : null,
       h('div', { class: 'card' }, h('h2', null, 'Platby materiálu podle pracovníků'),
         h('div', { class: 'tablewrap' }, h('table', { class: 't' },
           h('thead', null, h('tr', null, ['Kdo platil', 'Zaplatil celkem', 'Spotřebováno', 'Zbývá ve skladu', 'Již proplaceno', 'K vyplacení'].map((t, i) => h('th', { class: i ? 'r' : '' }, t)))),

@@ -4,6 +4,7 @@ import { GOOGLE_CLIENT_ID } from './config.js';
 let tokenClient = null, token = null, tokenExp = 0;
 const FOLDER = 'JL-OBKLADY zálohy';
 
+export const ensureDriveToken = () => getToken();
 export const driveReady = () => !!GOOGLE_CLIENT_ID;
 
 function loadGsi() {

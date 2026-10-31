@@ -40,6 +40,12 @@ export const S = { user: null, firma: { ...DEFAULT_FIRMA }, firmaBase: { ...DEFA
 // Profil = kdo je právě přihlášený (Lukáš / Honza). Mění jen údaje dodavatele v záhlaví dokumentů, data jsou společná.
 const PROFILE_KEY = 'jl-profile';
 export const profileList = () => Object.entries(S.firmaBase.profiles || {}).map(([key, p]) => ({ key, label: p.label || key }));
+// Údaje dodavatele podle toho, kdo doklad vystavil (ne podle toho, kdo ho právě otevřel)
+export function firmaFor(doc) {
+  const b = S.firmaBase;
+  const p = doc && doc.profile && (b.profiles || {})[doc.profile];
+  return p ? { ...b, ...p } : S.firma;
+}
 export function applyProfile() {
   const b = S.firmaBase;
   S.firma = { ...b, ...((b.profiles || {})[S.profile] || {}) };
@@ -65,6 +71,7 @@ async function fetchAll(table, order) {
   for (let from = 0; ; from += step) {
     let q = sb.from(table).select('*').range(from, from + step - 1);
     if (order) q = q.order(order);
+    if (table !== 'settings') q = q.order('id'); // stabilní stránkování při shodných názvech
     const { data, error } = await q;
     if (error) throw error;
     out.push(...data);
@@ -86,6 +93,7 @@ export async function loadAll() {
     S.contacts = contacts;
     S.prices = prices;
     S.loaded = true;
+    S.offline = false;
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ firma: S.firmaBase, contacts, prices })); } catch (_) { /* plná paměť */ }
     return true;
   } catch (e) {
@@ -104,6 +112,25 @@ export async function markBackupDone() {
   S.lastBackup = last;
   const { error } = await sb.from('settings').upsert({ key: 'backup', value: { last } });
   if (error) throw error;
+}
+
+// Uloží jen to, co uživatel v Nastavení skutečně změnil, a zachová změny druhé osoby
+export async function saveFirmaMerged(orig, mine) {
+  const { data: row, error: e0 } = await sb.from('settings').select('value').eq('key', 'firma').maybeSingle();
+  if (e0) throw e0;
+  const latest = JSON.parse(JSON.stringify((row && row.value) || {}));
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  for (const k of Object.keys(mine)) {
+    if (k === 'profiles') {
+      latest.profiles = latest.profiles || {};
+      for (const [pk, pv] of Object.entries(mine.profiles || {})) {
+        latest.profiles[pk] = latest.profiles[pk] || {};
+        for (const [fk, fv] of Object.entries(pv)) if (!same(fv, ((orig.profiles || {})[pk] || {})[fk])) latest.profiles[pk][fk] = fv;
+      }
+    } else if (!same(mine[k], orig[k])) latest[k] = mine[k];
+  }
+  await saveFirma(latest);
+  return latest;
 }
 
 export async function saveFirma(value) {
@@ -176,7 +203,7 @@ export function displayUnit(item) {
 }
 
 export const lineTotal = (r) => {
-  const q = parseNum(r.qty), p = parseNum(r.price), d = parseNum(r.disc);
+  const q = parseNum(r.qty), p = parseNum(r.price), d = Math.min(Math.max(parseNum(r.disc), 0), 1);
   if (!r.name || !q || !Number.isFinite(p)) return 0;
   return Math.round(q * p * (1 - d) * 100) / 100;
 };
@@ -204,7 +231,7 @@ export async function nextQuoteNumber() {
 export async function newQuote() {
   for (let i = 0; ; i++) {
     const number = await nextQuoteNumber();
-    const row = { number, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '' };
+    const row = { number, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '', profile: S.profile };
     const { data, error } = await sb.from('quotes').insert(row).select().single();
     if (!error) return data;
     if (error.code !== '23505' || i >= 3) throw error; // číslo mezitím zabral druhý uživatel
@@ -230,9 +257,9 @@ async function guardedUpdate(table, row, id, stamp, force) {
 
 export async function saveQuote(q, force = false) {
   const row = {
-    number: q.number, issued_on: q.issued_on, valid_days: q.valid_days, customer_id: q.customer_id || null,
+    number: q.number, issued_on: q.issued_on || isoToday(), valid_days: q.valid_days, customer_id: q.customer_id || null,
     customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
-    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {}, premium_items: q.premium_items || [],
+    project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {}, premium_items: q.premium_items || [], profile: q.profile || S.profile || null,
   };
   const data = await guardedUpdate('quotes', row, q.id, q.updated_at, force);
   q.updated_at = data.updated_at;
@@ -306,8 +333,8 @@ export async function createInvoice(row) {
   }
 }
 export async function saveInvoice(i, force = false) {
-  const row = { number: i.number, issued_on: i.issued_on, due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
-    customer_ids: i.customer_ids, description: i.description, amount: parseNum(i.amount), paid: !!i.paid };
+  const row = { number: i.number, issued_on: i.issued_on || isoToday(), due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
+    customer_ids: i.customer_ids, description: i.description, amount: parseNum(i.amount), paid: !!i.paid, profile: i.profile || S.profile || null };
   const data = await guardedUpdate('invoices', row, i.id, i.updated_at, force);
   i.updated_at = data.updated_at;
   return data;
@@ -322,7 +349,7 @@ S.rec = {};
 export async function loadRecords(kind) {
   const out = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from('records').select('*').eq('kind', kind).order('rec_date').order('created_at').range(from, from + 999);
+    const { data, error } = await sb.from('records').select('*').eq('kind', kind).order('rec_date').order('created_at').order('id').range(from, from + 999);
     if (error) throw error;
     out.push(...data);
     if (data.length < 1000) break;
@@ -337,7 +364,7 @@ export async function addRecord(kind, data = {}, date = isoToday()) {
   return r;
 }
 export async function saveRecord(r) {
-  const { error } = await sb.from('records').update({ rec_date: r.rec_date, data: r.data }).eq('id', r.id);
+  const { error } = await sb.from('records').update({ rec_date: r.rec_date || isoToday(), data: r.data }).eq('id', r.id);
   if (error) throw error;
 }
 export async function deleteRecord(r) {

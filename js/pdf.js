@@ -1,6 +1,6 @@
 // Vytvoření PDF (A4) z dokumentu nabídky / vyúčtování / faktury a uložení na Google Disk.
 import { toast } from './util.js';
-import { driveReady, uploadToDrive } from './drive.js';
+import { driveReady, uploadToDrive, ensureDriveToken } from './drive.js';
 
 const loaded = {};
 function loadScript(src) {
@@ -76,8 +76,9 @@ export const pdfName = (number, who) => `${safe(number)}${who ? ' - ' + safe(who
 export async function savePdfToDrive(html, name, btn) {
   if (!driveReady()) return toast('Google Disk není připojen', 'err');
   if (btn) btn.disabled = true;
-  toast('Vytvářím PDF…');
   try {
+    await ensureDriveToken(); // přihlášení k Googlu hned po kliknutí (jinak ho prohlížeč může zablokovat)
+    toast('Vytvářím PDF…');
     const blob = await htmlToPdf(html);
     const r = await uploadToDrive(name, blob, 'JL-OBKLADY PDF');
     toast('Uloženo na Disk: JL-OBKLADY PDF / ' + r.name);

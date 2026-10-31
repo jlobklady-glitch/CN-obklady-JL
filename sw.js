@@ -1,5 +1,5 @@
 // Service worker: síť má přednost (nová verze se načte hned po připojení), offline se bere z mezipaměti.
-const CACHE = 'jl-obklady-v2';
+const CACHE = 'jl-obklady-v3';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/main.js', 'vendor/supabase.js', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -20,15 +20,19 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // Supabase a ostatní se necachuje
-  e.respondWith(
-    fetch(req, { cache: 'no-cache' })
-      .then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.match(req).then((r) => r || caches.match('index.html')))
-  );
+  e.respondWith((async () => {
+    const net = fetch(req, { cache: 'no-cache' }).then((res) => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+      return res;
+    });
+    net.catch(() => {});
+    try {
+      // slabý signál: po 4 s se použije verze z mezipaměti
+      return await Promise.race([net, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))]);
+    } catch (_) {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      try { return await net; } catch (__) { return (await caches.match('index.html')) || Response.error(); }
+    }
+  })());
 });

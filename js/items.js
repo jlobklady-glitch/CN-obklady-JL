@@ -57,7 +57,7 @@ export function itemsEditor(items, onTouch) {
       const p = r.item_id && S.prices.find((x) => x.id === r.item_id);
       if (p && p.category === 'kabe') { r.price = priceFor(p, r.qty); priceIn.value = r.price; }
       upd(); } });
-    const discIn = h('input', { type: 'text', inputmode: 'decimal', class: 'num', value: r.disc ? Math.round(r.disc * 1000) / 10 : '', oninput: (e) => { r.disc = parseNum(e.target.value) / 100; upd(); } });
+    const discIn = h('input', { type: 'text', inputmode: 'decimal', class: 'num', value: r.disc ? Math.round(r.disc * 1000) / 10 : '', oninput: (e) => { r.disc = Math.min(Math.max(parseNum(e.target.value), 0), 100) / 100; upd(); } });
     const sug = suggestBox(nameIn, (p) => {
       r.item_id = p.id; r.name = displayName(p); r.unit = displayUnit(p); r.typ = p.category;
       r.qty = r.qty || 1; r.price = priceFor(p, r.qty);

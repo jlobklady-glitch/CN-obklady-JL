@@ -1,10 +1,14 @@
 // A4 dokument cenové nabídky ve vzhledu Excelu + tisk do PDF.
 import { h, esc, kc, num, fmtDate, addDays, parseNum, isoToday } from './util.js';
-import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA } from './store.js';
+import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA, firmaFor } from './store.js';
+
+// Dodavatel aktuálně vykreslovaného dokladu (podle toho, kdo doklad vystavil)
+let F = S.firma;
 import { czIban, spayd, qrSvg } from './pay.js';
 
 export function quoteDoc(q) {
-  const f = S.firma;
+  F = firmaFor(q);
+  const f = F;
   const items = (q.items || []).filter((r) => r.name);
   const total = quoteTotal(items);
   const validTo = addDays(q.issued_on, q.valid_days || f.valid_days || 30);
@@ -66,7 +70,7 @@ export function printDoc(html) {
 
 // ---------- finální vyúčtování ----------
 function partiesHtml(q) {
-  const f = S.firma;
+  const f = F;
   const c = S.contacts.find((x) => x.id === q.customer_id);
   const cus = [['Jméno / firma', q.customer_name], ['Adresa', q.customer_address],
     ...(c && c.kind === 'PO' ? [['IČO', c.ico], ['DIČ', c.dic]] : []), ['Kontakt', q.customer_contact], ['Stavba', q.project]].filter((r) => r[1] || r[0] === 'Jméno / firma');
@@ -74,8 +78,8 @@ function partiesHtml(q) {
     <div>${esc(f.phone)}${f.email ? ' · ' + esc(f.email) : ''}</div></div>
     <div class="cus"><div class="lab">Odběratel</div>${cus.map(([l, v]) => `<div class="r"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`;
 }
-const headBar = (title) => `<div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">${title}</div></div><div class="tag">${esc(S.firma.tagline)}</div><div class="stripe"></div>`;
-const footer = () => `<div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div><img class="strip" src="assets/strip-vy.jpg" alt=""><div class="foot">${esc(S.firma.name)} · ${esc(S.firma.phone)} · ${esc(S.firma.email)}</div>`;
+const headBar = (title) => `<div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">${title}</div></div><div class="tag">${esc(F.tagline)}</div><div class="stripe"></div>`;
+const footer = () => `<div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div><img class="strip" src="assets/strip-vy.jpg" alt=""><div class="foot">${esc(F.name)} · ${esc(F.phone)} · ${esc(F.email)}</div>`;
 
 export function settlementTotals(q) {
   const st = q.settlement || {};
@@ -86,6 +90,7 @@ export function settlementTotals(q) {
 }
 
 export function settlementDoc(q) {
+  F = firmaFor(q);
   const st = q.settlement || {};
   const items = (st.items || []).filter((r) => r.name);
   const t = settlementTotals(q);
@@ -107,7 +112,8 @@ export function settlementDoc(q) {
 
 // ---------- faktura ----------
 export function invoiceDoc(inv) {
-  const f = S.firma;
+  F = firmaFor(inv);
+  const f = F;
   const spd = spayd({ account: f.account, amount: Number(inv.amount), vs: inv.number, msg: 'Faktura ' + inv.number });
   const qr = qrSvg(spd);
   return `<div class="doc">${headBar('FAKTURA ' + esc(inv.number))}
@@ -133,7 +139,7 @@ export function invoiceDoc(inv) {
 function premiumPage(q, base) {
   const extra = (q.premium_items || []).filter((r) => r.name);
   const sumExtra = quoteTotal(extra);
-  const qa = (S.firma.qa && S.firma.qa.length ? S.firma.qa : DEFAULT_QA).filter((x) => x.show && x.q);
+  const qa = (F.qa && F.qa.length ? F.qa : DEFAULT_QA).filter((x) => x.show && x.q);
   const rows = extra.map((r) => `<tr><td colspan="2">${esc(r.name)}</td><td class="c">${esc(r.unit)}</td><td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
   return `<div class="pagebreak"></div>
     <div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">VARIANTA PREMIUM</div></div><div class="stripe"></div>

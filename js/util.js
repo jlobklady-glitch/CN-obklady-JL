@@ -30,7 +30,10 @@ export const num = (n) => nf0.format(Number(n) || 0);
 
 export function parseNum(v) {
   if (typeof v === 'number') return v;
-  const s = String(v ?? '').replace(/[\s\u00a0\u202f]/g, '').replace('%', '').replace(',', '.');
+  let s = String(v ?? '').replace(/[\s\u00a0\u202f]/g, '').replace('%', '');
+  // 1.234,56 → 1234.56 (tečka tisíců + desetinná čárka); 1,234.56 → 1234.56
+  if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else s = s.replace(',', '.');
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }
@@ -107,4 +110,34 @@ export function conflictBox(what) {
           h('button', { class: 'btn gold', onclick: () => done('reload') }, 'Načíst novou verzi'))));
     document.body.append(overlay);
   });
+}
+
+// Ukládání rozpracovaného záznamu: jedno uložení po druhém (fronta), bez ztráty změn provedených během ukládání.
+// save(force) uloží záznam; vrací { touch, flush (→ true/false), isDirty, stop }
+export function makeSaver(save, what, state) {
+  let ver = 0, saved = 0, chain = Promise.resolve(true), timer = null, resolving = false, stopped = false;
+  const show = (txt, cls) => { state.textContent = txt; state.className = 'savestate ' + (cls || ''); };
+  const run = async (force) => {
+    if (stopped || ver === saved) return true;
+    const my = ver;
+    try {
+      await save(force === true);
+      saved = my;
+      if (ver === saved) show('Uloženo'); else show('Ukládám…', 'dirty');
+      return true;
+    } catch (e) {
+      if (e.conflict) {
+        if (resolving) return false;
+        resolving = true; const c = await conflictBox(what); resolving = false;
+        if (c === 'reload') { stopped = true; location.reload(); return false; }
+        return run(true);
+      }
+      show('Chyba ukládání', 'dirty');
+      toast(e.code === '23505' ? 'Toto číslo už existuje u jiného záznamu – zadejte jiné.' : 'Nepodařilo se uložit: ' + e.message, 'err');
+      return false;
+    }
+  };
+  const flush = () => { clearTimeout(timer); chain = chain.then(() => run()); return chain; };
+  const touch = () => { ver++; show('Ukládám…', 'dirty'); clearTimeout(timer); timer = setTimeout(flush, 800); };
+  return { touch, flush, isDirty: () => ver !== saved && !stopped, stop: () => { stopped = true; clearTimeout(timer); } };
 }

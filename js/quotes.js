@@ -1,5 +1,5 @@
 // Nabídky: seznam a editor.
-import { h, kc, fmtDate, matcher, debounce, toast, confirmBox, conflictBox, parseNum, num, isoToday } from './util.js';
+import { h, kc, fmtDate, matcher, toast, confirmBox, makeSaver, parseNum, num, isoToday } from './util.js';
 import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
@@ -40,25 +40,9 @@ export async function quoteEditor(root, id) {
   try { q = await getQuote(id); } catch (e) { root.replaceChildren(h('div', { class: 'card' }, 'Nabídka nenalezena.')); return; }
   q.items = q.items || [];
   const state = h('span', { class: 'savestate' }, 'Uloženo');
-  let dirty = false;
-  let resolving = false;
-  const doSave = async (force = false) => {
-    if (resolving) return;
-    try { await saveQuote(q, force === true); dirty = false; state.textContent = 'Uloženo'; state.className = 'savestate'; }
-    catch (e) {
-      if (e.conflict) {
-        resolving = true;
-        const c = await conflictBox('Tuto nabídku');
-        resolving = false;
-        if (c === 'reload') { dirty = false; window.__flushSave = null; return location.reload(); }
-        return doSave(true);
-      }
-      state.textContent = 'Chyba ukládání'; toast('Nepodařilo se uložit: ' + e.message, 'err');
-    }
-  };
-  const autosave = debounce(() => doSave(), 800);
-  const touch = () => { dirty = true; state.textContent = 'Ukládám…'; state.className = 'savestate dirty'; autosave(); };
-  window.__flushSave = async () => { if (dirty) await autosave.flush(); };
+  const saver = makeSaver((f) => saveQuote(q, f), 'Tuto nabídku', state);
+  const touch = saver.touch;
+  window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;
 
   const bind = (key, type = 'text') => (e) => { q[key] = type === 'num' ? parseNum(e.target.value) : e.target.value; touch(); };
   const field = (label, el, cls = '') => h('div', { class: cls }, h('label', { class: 'f' }, label), el);
@@ -113,8 +97,8 @@ export async function quoteEditor(root, id) {
       h('h1', null, q.number), state,
       h('button', { class: 'btn ghost small', onclick: showPreview }, 'Náhled'),
       h('a', { href: '#/vyuctovani/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Vyúčtování'),
-      h('button', { class: 'btn ghost small', onclick: async (e) => { await autosave.flush(); savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target); } }, 'PDF na Disk'),
-      h('button', { class: 'btn gold', onclick: async () => { await autosave.flush(); printDoc(quoteDoc(q)); } }, 'PDF / Tisk')),
+      h('button', { class: 'btn ghost small', onclick: async (e) => { await saver.flush(); savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target); } }, 'PDF na Disk'),
+      h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(quoteDoc(q)); } }, 'PDF / Tisk')),
     h('div', { class: 'card' }, h('div', { class: 'grid c4' },
       field('Číslo nabídky', h('input', { type: 'text', value: q.number, oninput: bind('number') })),
       field('Datum vystavení', h('input', { type: 'date', value: q.issued_on, oninput: bind('issued_on') })),
@@ -134,6 +118,6 @@ export async function quoteEditor(root, id) {
       field('Stav platby', h('select', { onchange: bind('payment_status') }, PLATBA.map((s) => h('option', { selected: s === q.payment_status }, s)))))),
     h('div', { class: 'row end' },
       h('button', { class: 'btn ghost', onclick: async () => { const n = await duplicateQuote(q); toast('Zkopírováno jako ' + n.number); location.hash = '#/nabidka/' + n.id; } }, 'Duplikovat'),
-      h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(`Smazat nabídku ${q.number}?`)) { await deleteQuote(q.id); location.hash = '#/nabidky'; } } }, 'Smazat')),
+      h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(`Smazat nabídku ${q.number}?`)) { saver.stop(); window.__flushSave = null; window.__isDirty = null; await deleteQuote(q.id); location.hash = '#/nabidky'; } } }, 'Smazat')),
     preview);
 }

@@ -4,10 +4,10 @@ import { driveReady, uploadToDrive } from './drive.js';
 
 const TABLES = [['settings', 'key'], ['contacts', 'id'], ['price_items', 'id'], ['quotes', 'id'], ['invoices', 'id'], ['records', 'id']];
 
-async function all(table) {
+async function all(table, pk) {
   const out = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from(table).select('*').range(from, from + 999);
+    const { data, error } = await sb.from(table).select('*').order(pk).range(from, from + 999);
     if (error) throw error;
     out.push(...data);
     if (data.length < 1000) break;
@@ -17,14 +17,14 @@ async function all(table) {
 
 export async function buildBackup() {
   const data = { app: 'jl-obklady', created: new Date().toISOString(), tables: {} };
-  for (const [t] of TABLES) data.tables[t] = await all(t);
+  for (const [t, key] of TABLES) data.tables[t] = await all(t, key);
   const name = `JL-OBKLADY-zaloha-${data.created.slice(0, 10)}.json`;
   return { data, name, blob: new Blob([JSON.stringify(data)], { type: 'application/json' }), counts: counts(data) };
 }
 
 export async function makeBackup() {
   const data = { app: 'jl-obklady', created: new Date().toISOString(), tables: {} };
-  for (const [t] of TABLES) data.tables[t] = await all(t);
+  for (const [t, key] of TABLES) data.tables[t] = await all(t, key);
   const name = `JL-OBKLADY-zaloha-${data.created.slice(0, 10)}.json`;
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const file = new File([blob], name, { type: 'application/json' });
