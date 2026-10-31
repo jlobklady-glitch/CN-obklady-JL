@@ -1,6 +1,6 @@
-import { h, toast } from './util.js';
+import { h, toast, kc, isoToday, addDays } from './util.js';
 import { backupToDrive } from './backup.js';
-import { sb, S, loadAll, profileList, setProfile } from './store.js';
+import { sb, S, loadAll, profileList, setProfile, listInvoices } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
@@ -89,6 +89,7 @@ async function route() {
   const bkBanner = (days === null || days >= 7) && !S.offline ? h('div', { class: 'banner' }, h('span', null, days === null ? 'Data ještě nebyla zálohována. ' : `Poslední záloha byla před ${days} dny. `),
     h('button', { class: 'btn small gold', onclick: async (e) => { e.target.disabled = true; try { const r = await backupToDrive(); toast('Záloha uložena na Disk: ' + r.name); bkBanner.remove(); } catch (er) { toast(er.message, 'err'); e.target.disabled = false; } } }, 'Zálohovat teď')) : null;
   app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, bkBanner, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
+  if (!S.offline) dueBanner(main);
   stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
@@ -122,3 +123,23 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('beforeunload', (e) => { if (window.__isDirty && window.__isDirty()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('pagehide', () => { if (window.__flushSave) window.__flushSave().catch(() => {}); });
 boot();
+
+// Upozornění na faktury po splatnosti (a blížící se splatnost do 3 dnů) – zobrazí se nad obsahem po každém otevření aplikace.
+async function dueBanner(main) {
+  try {
+    const inv = (await listInvoices()).filter((i) => !i.paid && i.due_on);
+    const today = isoToday(), soon = addDays(today, 3);
+    const late = inv.filter((i) => i.due_on < today), near = inv.filter((i) => i.due_on >= today && i.due_on <= soon);
+    if (!late.length && !near.length) return;
+    const sum = (a) => a.reduce((t, i) => t + Number(i.amount || 0), 0);
+    const parts = [];
+    if (late.length) parts.push(`Po splatnosti: ${late.length} ${late.length === 1 ? 'faktura' : late.length < 5 ? 'faktury' : 'faktur'} (${kc(sum(late))})`);
+    if (near.length) parts.push(`Splatnost do 3 dnů: ${near.length} (${kc(sum(near))})`);
+    const first = (late[0] || near[0]);
+    const el = h('div', { class: 'banner', style: late.length ? { background: '#fde8e8', borderColor: '#d33', color: '#7a1010' } : {} },
+      h('span', null, parts.join(' · ') + '. '),
+      h('a', { class: 'btn small gold', href: late.length + near.length === 1 ? '#/faktura/' + first.id : '#/prehled', style: { textDecoration: 'none' } }, 'Zobrazit'),
+      h('button', { class: 'btn small ghost', onclick: () => el.remove() }, '×'));
+    main.parentNode.insertBefore(el, main);
+  } catch (_) { /* upozornění je jen doplněk */ }
+}

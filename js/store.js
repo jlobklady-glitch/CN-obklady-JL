@@ -319,14 +319,21 @@ export async function getInvoice(id) {
   if (error) throw error;
   return data;
 }
+// Číselné řady faktur: každý profil má vlastní (první profil RRRRNNN, druhý RRRR1NNN, třetí RRRR2NNN …).
+// Číslo musí zůstat v databázi unikátní, proto se řady liší předčíslím.
+export function invoicePrefix(profileKey, yr) {
+  const idx = Math.max(0, profileList().findIndex((p) => p.key === profileKey));
+  return `${yr}${idx ? idx : ''}`;
+}
 export async function createInvoice(row) {
   const yr = new Date().getFullYear();
-  const { data: ex, error: e1 } = await sb.from('invoices').select('number').like('number', `${yr}%`);
+  const pre = invoicePrefix(row.profile || S.profile, yr);
+  const { data: ex, error: e1 } = await sb.from('invoices').select('number').like('number', `${pre}%`);
   if (e1) throw e1;
   let mx = 0;
-  for (const r of ex) { const n = parseInt(r.number.slice(4), 10); if (n > mx) mx = n; }
+  for (const r of ex) { const m = String(r.number).match(new RegExp(`^${pre}(\\d{3})$`)); if (m && Number(m[1]) > mx) mx = Number(m[1]); }
   for (let i = 0; ; i++) {
-    const number = `${yr}${String(mx + 1 + i).padStart(3, '0')}`;
+    const number = `${pre}${String(mx + 1 + i).padStart(3, '0')}`;
     const { data, error } = await sb.from('invoices').insert({ ...row, number }).select().single();
     if (!error) return data;
     if (error.code !== '23505' || i >= 3) throw error;
