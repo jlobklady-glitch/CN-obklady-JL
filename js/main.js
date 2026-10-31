@@ -5,6 +5,7 @@ import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
 import { prehledView } from './prehled.js';
+import { ziskView } from './ziskovost.js';
 import { skladView } from './sklad.js';
 import { hodinyView } from './hodiny.js';
 import { zbyloView } from './zbylo.js';
@@ -46,7 +47,7 @@ function profilePicker(then) {
       h('p', { class: 'muted' }, 'Profil mění jen údaje dodavatele v záhlaví nabídek a faktur. Data jsou společná. Profil lze kdykoli změnit v menu.'))));
 }
 
-const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
+const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 function stackAll(el) {
   el.querySelectorAll('table.t').forEach((t) => {
@@ -92,6 +93,7 @@ async function route() {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/zisk')) await ziskView(main);
     else if (hash.startsWith('#/sklad')) await skladView(main);
     else if (hash.startsWith('#/hodiny')) await hodinyView(main);
     else if (hash.startsWith('#/zbylo')) await zbyloView(main);

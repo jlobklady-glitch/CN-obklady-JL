@@ -91,3 +91,20 @@ export async function skladView(root) {
   await Promise.all([inList.ready, outList.ready]);
   drawSum();
 }
+
+// Průměrná nákupní cena za 1 MJ produktu (z příjmů) – pro ocenění spotřeby na zakázku
+export function avgUnitPrices() {
+  const acc = {};
+  for (const r of S.rec.stock_in || []) {
+    const p = S.prices.find((x) => x.id === r.data.product);
+    if (!p) continue;
+    const pack = Number(p.pack) || 1, packs = n(r.data.packs);
+    const delivered = n(r.data.delivered) || packs * pack;
+    const value = packs * (n(r.data.price_pack) || priceFor(p, 1));
+    const a = acc[p.id] || (acc[p.id] = { qty: 0, value: 0 });
+    a.qty += delivered; a.value += value;
+  }
+  const out = {};
+  for (const id in acc) out[id] = acc[id].qty ? acc[id].value / acc[id].qty : 0;
+  return out;
+}
