@@ -147,38 +147,57 @@ export function parsePrace(sheets) {
   return out;
 }
 const toks = (s) => new Set(norm(s).replace(/[^a-z0-9 ]/g, ' ').split(' ').filter((w) => w.length > 1));
-export function similar(a, b) {
+export function similar(a, b, th = 0.45) {
   const A = toks(a), B = toks(b); if (!A.size || !B.size) return false;
   let i = 0; A.forEach((w) => { if (B.has(w)) i++; });
-  return i / (A.size + B.size - i) >= 0.45;
+  return i / (A.size + B.size - i) >= th;
 }
-export function planPrace(incoming) {
+export function planPrace(incomingRaw) {
   const cur = S.prices.filter((p) => PRACE_CATS.includes(p.category));
-  const byCode = new Map(); cur.forEach((p) => { if (p.code) { if (!byCode.has(p.code)) byCode.set(p.code, []); byCode.get(p.code).push(p); } });
-  const used = new Set(cur.map((p) => p.code).filter(Boolean)); incoming.forEach((n) => used.add(n.code));
+  const used = new Set(cur.map((p) => p.code).filter(Boolean)); incomingRaw.forEach((n) => used.add(n.code));
   const nextCode = (code) => { const m = String(code).match(/^(.*?)(\d+)$/); if (!m) return code + '-2'; let n = Number(m[2]); const w = m[2].length; let c; do { n++; c = m[1] + String(n).padStart(w, '0'); } while (used.has(c)); used.add(c); return c; };
-  const upd = [], add = [], same = [], del = [], renames = [], seen = new Set();
+  // v souboru: přesné duplicity (stejný kód i název) se zahodí, stejný kód u jiné položky dostane nový kód
+  const seenCN = new Map(), incoming = [], fileFixes = [];
+  for (const n of incomingRaw) {
+    if (n.code) {
+      const prev = seenCN.get(n.code);
+      if (prev) {
+        if (similar(prev.name, n.name) && prev.unit === n.unit) { fileFixes.push({ dup: true, n }); continue; }
+        const nc = nextCode(n.code); fileFixes.push({ from: n.code, to: nc, n }); n = { ...n, code: nc };
+      }
+      seenCN.set(n.code, n);
+    }
+    incoming.push(n);
+  }
+  // 1. průchod: párování podle kódu + podobnosti názvu, jinak podle velmi podobného názvu
+  const matched = new Map(); // id -> incoming
+  const pairs = new Map();   // incoming -> existing
+  const free = (p) => !matched.has(p.id);
   for (const n of incoming) {
-    const cands = n.code ? (byCode.get(n.code) || []) : [];
-    let o = cands.find((p) => similar(p.name, n.name)) || null;
-    if (!o && n.code) {
-      // stejný kód, ale jiná položka → původní dostane nový kód, nová se přidá
-      cands.forEach((p) => { if (!seen.has(p.id)) { renames.push({ o: p, code: nextCode(p.code) }); seen.add(p.id); } });
-    }
-    if (!o) { // bez kódu: zkus shodu přesným názvem
-      o = !n.code ? cur.find((p) => norm(p.name) === norm(n.name) && p.category === n.category) || null : null;
-    }
-    if (n.del) { if (o) del.push(o); continue; }
+    let o = null;
+    if (n.code) o = cur.find((p) => free(p) && p.code === n.code && similar(p.name, n.name)) || null;
+    if (!o) o = cur.find((p) => free(p) && p.category === n.category && (n.code ? similar(p.name, n.name, 0.7) : norm(p.name) === norm(n.name))) || null;
+    if (o) { matched.set(o.id, n); pairs.set(n, o); }
+  }
+  // 2. průchod: nespárované nové položky se shodným kódem u jiné (nespárované) položky v aplikaci → ta stará dostane nový kód
+  const renames = [];
+  for (const n of incoming) {
+    if (pairs.has(n) || !n.code) continue;
+    cur.filter((p) => free(p) && p.code === n.code).forEach((p) => { renames.push({ o: p, code: nextCode(p.code) }); matched.set(p.id, null); });
+  }
+  const upd = [], add = [], same = [], del = [];
+  for (const n of incoming) {
+    const o = pairs.get(n);
     const price = n.newPrice ?? n.price;
+    if (n.del) { if (o) del.push(o); continue; }
     if (!o) { add.push({ ...n, price }); continue; }
-    seen.add(o.id);
     const e = o.extra || {};
-    const diff = Math.abs(Number(o.price) - price) > 0.0049 || clean(o.name) !== n.name || clean(o.unit) !== n.unit || (e.note || '') !== n.note || (e.group || '') !== n.group || o.category !== n.category;
+    const diff = Math.abs(Number(o.price) - price) > 0.0049 || clean(o.name) !== n.name || clean(o.unit) !== n.unit || (e.note || '') !== n.note || (e.group || '') !== n.group || o.category !== n.category || (n.code && o.code !== n.code);
     (diff ? upd : same).push({ o, n: { ...n, price } });
   }
-  const touched = new Set([...upd, ...same].map((x) => x.o.id)); del.forEach((p) => touched.add(p.id)); renames.forEach((r) => touched.add(r.o.id));
+  const touched = new Set([...upd, ...same, ...del].map((x) => (x.o || x).id)); renames.forEach((r) => touched.add(r.o.id));
   const missing = cur.filter((p) => !touched.has(p.id));
-  return { upd, add, same, del, renames, missing };
+  return { upd, add, same, del, renames, missing, fileFixes };
 }
 async function applyPrace(pl) {
   const rowOf = (n, o) => ({ category: n.category, code: n.code, name: n.name, unit: n.unit, price: n.price, pack: 1, extra: { ...((o && o.extra) || {}), group: n.group, note: n.note }, active: true });
@@ -206,6 +225,7 @@ function showPracePlan(pl, done) {
       h('h2', null, 'Import ceníku prací'),
       h('p', null, `Beze změny: ${pl.same.length} · Upraveno: `, h('b', null, String(pl.upd.length)), ' · Nové: ', h('b', null, String(pl.add.length)), ' · Ke smazání: ', h('b', null, String(pl.del.length)), ` · V aplikaci navíc (zůstanou): ${pl.missing.length}`),
       pl.renames.length ? h('p', { style: { color: '#a15c00' } }, `Pozor: ${pl.renames.length} položek má stejný kód jako jiná položka v souboru. Původní položky se nemažou, jen dostanou nový kód: `, pl.renames.slice(0, 6).map((r) => `${r.o.code} → ${r.code}`).join(', '), pl.renames.length > 6 ? '…' : '') : null,
+      pl.fileFixes && pl.fileFixes.length ? h('p', { class: 'muted' }, `V souboru: ${pl.fileFixes.filter((x) => x.dup).length} zdvojených řádků přeskočeno, ${pl.fileFixes.filter((x) => !x.dup).length} opakovaných kódů přečíslováno.`) : null,
       pl.upd.length ? h('div', null, h('b', null, 'Příklady úprav'), ...ex(pl.upd, ({ o, n }) => `${n.code} ${n.name}: ${o.price} → ${n.price} Kč`)) : null,
       pl.add.length ? h('div', { style: { marginTop: '6px' } }, h('b', null, 'Příklady nových'), ...ex(pl.add, (n) => `${n.code} ${n.name} (${n.price} Kč)`)) : null,
       pl.del.length ? h('div', { style: { marginTop: '6px' } }, h('b', null, 'Smazáno bude'), ...ex(pl.del, (p) => `${p.code} ${p.name}`)) : null,
