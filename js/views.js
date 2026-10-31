@@ -71,7 +71,7 @@ export function pricesView(root) {
           h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); draw(); } } }, '×')));
     };
     body.replaceChildren(
-      (cat === 'mapei' || cat === 'kabe') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(cat, draw)) : null,
+      (cat === 'mapei' || cat === 'kabe' || cat === 'prace') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(cat, draw)) : null,
     h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
       h('div', { class: 'prlist' }, rows.map(card)));
   };
