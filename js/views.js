@@ -47,15 +47,38 @@ export function contactsView(root) {
   draw();
 }
 
+// Záložky ceníku prací (podmenu u „Práce“) – pořadí jako v importovaném Excelu
+const SHEETS = ['Práce', 'Obklad (stěna)', 'Dlažba (podlaha)', 'Sádrokartony (SDK)', 'Opravy a rekonstrukce', 'Otvory a výřezy', 'WC tlačítka z obkladu', 'Kamenické rohy (Jolly)', 'Výrobky z dlažby', 'Skryté systémy v obkladu', 'Terasy a exteriéry', 'Schody a detail s LED', 'Bazény, wellness a chemie', 'Zdění a příčky', 'Osvětlení a elektro detaily', 'Speciální povrchy a mramor'];
+const CORE = { prace: 'Práce', stena: 'Obklad (stěna)', podlaha: 'Dlažba (podlaha)' };
+const GTOP = [['prace', 'Práce'], ['mapei', 'Materiál MAPEI'], ['kabe', 'Betonová stěrka KABE'], ['ostatni', 'Ostatní']];
+const sheetOf = (p) => {
+  const e = p.extra || {};
+  if (e.sheet && SHEETS.includes(e.sheet)) return e.sheet;
+  const g = String(e.group || ''); const i = g.indexOf(' – ');
+  if (i > 0 && SHEETS.includes(g.slice(0, i))) return g.slice(0, i);
+  return CORE[p.category] || 'Práce';
+};
+const groupOf = (p) => { const g = String((p.extra || {}).group || ''); const i = g.indexOf(' – '); return i > 0 && SHEETS.includes(g.slice(0, i)) ? g.slice(i + 3) : g; };
+const isWork = (p) => ['prace', 'stena', 'podlaha'].includes(p.category);
+
 export function pricesView(root) {
-  let cat = 'prace', q = '';
+  let top = 'prace', sub = '', q = '', limit = 60;
   const body = h('div');
-  const LIMIT = 60;
   const grow = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
+  const subRow = h('div', { class: 'tabsrow' });
+  const drawSub = () => {
+    subRow.replaceChildren();
+    if (top !== 'prace') return;
+    const cnt = {}; S.prices.filter(isWork).forEach((p) => { const k = sheetOf(p); cnt[k] = (cnt[k] || 0) + 1; });
+    const total = Object.values(cnt).reduce((a, b) => a + b, 0);
+    const mk = (key, label, n) => h('button', { class: 'btn small ' + (sub === key ? '' : 'ghost'), onclick: () => { sub = key; limit = 60; drawSub(); draw(); } }, `${label} (${n})`);
+    subRow.append(mk('', 'Vše', total), ...SHEETS.filter((n) => cnt[n]).map((n) => mk(n, n, cnt[n])));
+  };
   const draw = () => {
     const m = matcher(q);
-    const all = S.prices.filter((p) => p.category === cat && (!q || m(`${p.code} ${p.name}`)));
-    const rows = all.slice(0, LIMIT);
+    let all = S.prices.filter((p) => (top === 'prace' ? isWork(p) && (!sub || sheetOf(p) === sub) : p.category === top) && (!q || m(`${p.code} ${p.name}`)));
+    if (top === 'prace') all = all.slice().sort((a, b) => SHEETS.indexOf(sheetOf(a)) - SHEETS.indexOf(sheetOf(b)) || String(groupOf(a)).localeCompare(String(groupOf(b)), 'cs', { numeric: true }) || String(a.code || '~').localeCompare(String(b.code || '~'), 'cs', { numeric: true }));
+    const rows = all.slice(0, limit);
     const save = async (p, k, v) => {
       p[k] = (k === 'price' || k === 'pack') ? parseNum(v) : v;
       try { await savePrice(p); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); }
@@ -65,23 +88,40 @@ export function pricesView(root) {
     const card = (p) => {
       const ta = h('textarea', { rows: 1, onchange: (e) => save(p, 'name', e.target.value), oninput: (e) => grow(e.target) }, p.name);
       requestAnimationFrame(() => grow(ta));
+      const note = (p.extra || {}).note;
       return h('div', { class: 'pr' },
-        h('div', { class: 'pf pn' }, h('label', { class: 'f' }, 'Název'), ta),
-        h('div', { class: 'pr-small' }, small(p, 'code', 'Kód'), small(p, 'unit', 'MJ'), cat === 'mapei' ? small(p, 'pack', 'Balení') : null, small(p, 'price', 'Cena (Kč)'),
-          h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); draw(); } } }, '×')));
+        h('div', { class: 'pf pn' }, h('label', { class: 'f' }, 'Název'), ta, note ? h('div', { class: 'muted', style: { fontSize: '12px', marginTop: '2px' } }, note) : null),
+        h('div', { class: 'pr-small' }, small(p, 'code', 'Kód'), small(p, 'unit', 'MJ'), p.category === 'mapei' ? small(p, 'pack', 'Balení') : null, small(p, 'price', 'Cena (Kč)'),
+          h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); drawSub(); draw(); } } }, '×')));
     };
+    const list = []; let lastS = null, lastG = null;
+    for (const p of rows) {
+      if (top === 'prace') {
+        const sh = sheetOf(p), g = groupOf(p);
+        if (!sub && sh !== lastS) { list.push(h('h3', { style: { margin: '16px 0 2px', borderBottom: '2px solid #c9a24a' } }, sh)); lastS = sh; lastG = null; }
+        if (g !== lastG) { if (g) list.push(h('div', { class: 'muted', style: { fontWeight: '700', margin: '10px 0 2px' } }, g)); lastG = g; }
+      }
+      list.push(card(p));
+    }
     body.replaceChildren(
-      (cat === 'mapei' || cat === 'kabe' || cat === 'prace') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(cat, draw)) : null,
-    h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek` + (all.length > LIMIT ? ` (zobrazeno prvních ${LIMIT}, zpřesněte hledání)` : '')),
-      h('div', { class: 'prlist' }, rows.map(card)));
+      (top === 'mapei' || top === 'kabe' || top === 'prace') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(top, () => { drawSub(); draw(); })) : null,
+      h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek`),
+      h('div', { class: 'prlist' }, list),
+      all.length > limit ? h('button', { class: 'btn ghost', style: { marginTop: '10px' }, onclick: () => { limit += 100; draw(); } }, `Zobrazit dalších ${Math.min(100, all.length - limit)} (zobrazeno ${limit} z ${all.length})`) : null);
   };
-  const searchIn = h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; draw(); } });
-  const tabs = h('div', { class: 'tabsrow' }, TYPES.map((t) => h('button', { class: 'btn small ' + (t.key === cat ? '' : 'ghost'), onclick: (e) => { cat = t.key; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); draw(); } }, t.label)));
+  const searchIn = h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; limit = 60; draw(); } });
+  const tabs = h('div', { class: 'tabsrow' }, GTOP.map(([k, label]) => h('button', { class: 'btn small ' + (k === top ? '' : 'ghost'), onclick: (e) => { top = k; sub = ''; limit = 60; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); drawSub(); draw(); } }, label)));
   root.replaceChildren(
-    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => { try { await savePrice({ category: cat, name: 'Nová položka', price: 0 }); q = 'Nová položka'; searchIn.value = q; draw(); toast('Položka přidána – je na konci seznamu'); } catch (e) { toast(e.message, 'err'); } } }, '+ Nová položka')),
-    tabs, h('div', { style: { margin: '10px 0' } }, searchIn),
+    h('div', { class: 'pagehead' }, h('h1', null, 'Ceníky'), h('button', { class: 'btn gold', onclick: async () => {
+      try {
+        const cat = top === 'prace' ? (sub === 'Obklad (stěna)' ? 'stena' : sub === 'Dlažba (podlaha)' ? 'podlaha' : 'prace') : top;
+        await savePrice({ category: cat, name: 'Nová položka', price: 0, ...(cat === 'prace' && sub && sub !== 'Práce' ? { extra: { sheet: sub, group: sub } } : {}) });
+        q = 'Nová položka'; searchIn.value = q; drawSub(); draw(); toast('Položka přidána');
+      } catch (e) { toast(e.message, 'err'); }
+    } }, '+ Nová položka')),
+    tabs, subRow, h('div', { style: { margin: '10px 0' } }, searchIn),
     body);
-  draw();
+  drawSub(); draw();
 }
 
 export function settingsView(root) {

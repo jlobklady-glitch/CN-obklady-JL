@@ -200,7 +200,7 @@ export function planPrace(incomingRaw) {
   return { upd, add, same, del, renames, missing, fileFixes };
 }
 async function applyPrace(pl) {
-  const rowOf = (n, o) => ({ category: n.category, code: n.code, name: n.name, unit: n.unit, price: n.price, pack: 1, extra: { ...((o && o.extra) || {}), group: n.group, note: n.note }, active: true });
+  const rowOf = (n, o) => ({ category: n.category, code: n.code, name: n.name, unit: n.unit, price: n.price, pack: 1, extra: { ...((o && o.extra) || {}), group: n.group, note: n.note, sheet: n.sheet }, active: true });
   const ups = [...pl.upd.map(({ o, n }) => ({ id: o.id, ...rowOf(n, o) })), ...pl.renames.filter((r) => !pl.upd.some((u) => u.o.id === r.o.id)).map((r) => ({ id: r.o.id, category: r.o.category, code: r.code, name: r.o.name, unit: r.o.unit || '', price: r.o.price, pack: r.o.pack || 1, extra: r.o.extra || {}, active: r.o.active !== false }))];
   // přejmenování kódu musí proběhnout dřív než vložení nových položek (kvůli čitelnosti, jedinečnost kódu DB nevyžaduje)
   for (let i = 0; i < ups.length; i += 200) { const { error } = await sb.from('price_items').upsert(ups.slice(i, i + 200), { onConflict: 'id' }); if (error) throw error; }
