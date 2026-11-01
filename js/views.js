@@ -103,11 +103,11 @@ export function pricesView(root) {
       }
       list.push(card(p));
     }
-    body.replaceChildren(
+    body.replaceChildren(...[
       (top === 'mapei' || top === 'kabe' || top === 'prace') ? h('div', { style: { margin: '0 0 8px' } }, importButtons(top, () => { drawSub(); draw(); })) : null,
       h('div', { class: 'muted', style: { marginBottom: '6px' } }, `${all.length} položek`),
       h('div', { class: 'prlist' }, list),
-      all.length > limit ? h('button', { class: 'btn ghost', style: { marginTop: '10px' }, onclick: () => { limit += 100; draw(); } }, `Zobrazit dalších ${Math.min(100, all.length - limit)} (zobrazeno ${limit} z ${all.length})`) : null);
+      all.length > limit ? h('button', { class: 'btn ghost', style: { marginTop: '10px' }, onclick: () => { limit += 100; draw(); } }, `Zobrazit dalších ${Math.min(100, all.length - limit)} (zobrazeno ${limit} z ${all.length})`) : null].filter(Boolean));
   };
   const searchIn = h('input', { type: 'text', class: 'search', placeholder: 'Hledat kód nebo název…', oninput: (e) => { q = e.target.value; limit = 60; draw(); } });
   const tabs = h('div', { class: 'tabsrow' }, GTOP.map(([k, label]) => h('button', { class: 'btn small ' + (k === top ? '' : 'ghost'), onclick: (e) => { top = k; sub = ''; limit = 60; [...tabs.children].forEach((b) => b.classList.add('ghost')); e.target.classList.remove('ghost'); drawSub(); draw(); } }, label)));
