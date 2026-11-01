@@ -12,10 +12,19 @@ export const MAT = {
   primerG:   { re: /^PRIMER G$/i, label: 'MAPEI Primer G (penetrace)' },
   ecoGrip:   { re: /ECO\s+PRIM\s+GRIP\s+PLUS/i, label: 'MAPEI Eco Prim Grip Plus (penetrace nesavých podkladů)' },
   ultraplan: { re: /ULTRAPLAN\s+ECO\s+20/i, label: 'MAPEI Ultraplan Eco 20 (samonivelační stěrka)' },
-  keraflex:  { re: /KERAFLEX\s+MAXI\s+S1/i, label: 'MAPEI Keraflex Maxi S1 (lepidlo, třída S1)' },
+  keraflex:  { re: /KERAFLEX\s+MAXI\s+S1\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Keraflex Maxi S1 (lepidlo, třída S1)' },
+  keraflexX: { re: /KERAFLEX\s+EXTRA\s+S1\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Keraflex Extra S1 (lepidlo, třída S1)' },
+  ultralite1:{ re: /ULTRALITE\s+S1\s+FLEX\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Ultralite S1 Flex (lehké lepidlo, třída S1)' },
+  ultralite2:{ re: /ULTRALITE\s+S2\s+FLEX\s+\(LD\)\s+ŠEDÝ/i, label: 'MAPEI Ultralite S2 Flex (lehké lepidlo, třída S2)' },
+  smart:     { re: /MAPELASTIC\s+SMART\s+\/A\+B/i, label: 'MAPEI Mapelastic Smart (cementová hydroizolace, 2K)' },
+  mapenet:   { re: /MAPENET\s+150/i, label: 'MAPEI Mapenet 150 (skelná síťovina)' },
+  wp200:     { re: /MAPEGUARD\s+WP\s+200/i, label: 'MAPEI Mapeguard WP 200 (hydroizolační a separační membrána)' },
+  wpadh:     { re: /^MAPEGUARD\s+WP\s+ADHESIVE\s*$/i, label: 'MAPEI Mapeguard WP Adhesive (lepení přesahů)' },
+  cleaner:   { re: /KERAPOXY\s+CLEANER\s+SPRAY/i, label: 'MAPEI UltraCare Kerapoxy Cleaner Spray 0,75 l' },
+  mapesilLM: { re: /MAPESIL\s+LM/i, label: 'MAPEI Mapesil LM (neutrální silikon)', color: true },
   mapetex:   { re: /MAPETEX\s+SEL\s+N/i, label: 'MAPEI Mapetex SEL N (separační textilie)' },
   ultracolor:{ re: /ULTRACOLOR\s+PLUS/i, label: 'MAPEI Ultracolor Plus (cementová spárovací hmota)', color: true, minPack: 5 },
-  kerapoxy:  { re: /KERAPOXY\s+CQ/i, label: 'MAPEI Kerapoxy CQ (epoxidová spárovací hmota)', color: true },
+  kerapoxy:  { re: /KERAPOXY\s+EASY\s+DESIGN/i, label: 'MAPEI Kerapoxy Easy Design (epoxidová spárovací hmota)', color: true },
   mapesil:   { re: /MAPESIL\s+AC\s+ZERO/i, label: 'MAPEI Mapesil AC Zero (silikon)', color: true },
   klin:      { re: /MAPELEVEL\s+PROWDG\s+\(1bag=100/i, label: 'MAPEI Mapelevel PROWDG klínky' },
   mapegum:   { re: /^MAPEGUM\s+WPS$/i, label: 'MAPEI Mapegum WPS (tekutá hydroizolace)' },
@@ -41,8 +50,8 @@ export function defaults(p, mode) {
   const big = Math.max(...f) >= 60;
   return {
     mode, A: 10, fa: f[0], fb: f[1], thick: Math.max(...f) >= 120 ? 6 : 9, joint: big ? 2 : 3, perim: 0,
-    uneven: false, nivT: 3, penLayers: 1, penType: 'savy',
-    separ: mode === 'podlaha' && big, spony: big, butter: mode === 'podlaha' && big, bedT: big ? 5 : 3,
+    uneven: false, nivT: 3, penLayers: 1, penType: 'beton',
+    sep: mode === 'podlaha' && big ? 'mapetex' : 'none', adhesive: 'auto', silType: 'ac', spony: big, butter: mode === 'podlaha' && big, bedT: Math.max(...f) <= 60 ? 3 : 4,
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     wet: false, wetWalls: 0, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
@@ -62,11 +71,13 @@ export function plan(P) {
   const floor = P.mode === 'podlaha';
   const pen = Math.max(1, Number(P.penLayers) || 1);
   const penKey = P.penType === 'nesavy' ? 'ecoGrip' : 'primerG';
-  const penRate = P.penType === 'nesavy' ? 0.25 : 0.1;
-  const penNote = P.penType === 'nesavy' ? 'TL: 0,2–0,3 kg/m² na vrstvu (použito 0,25)' : 'TL: 0,05–0,2 kg/m² na vrstvu (použito 0,1)';
+  const penRate = P.penType === 'nesavy' ? 0.25 : P.penType === 'anhydrit' ? 0.12 : 0.05;
+  const penNote = P.penType === 'nesavy' ? 'TL: 0,2–0,3 kg/m² na vrstvu (použito 0,25)'
+    : P.penType === 'anhydrit' ? 'anhydrit: neředěný (TL: 0,08–0,15 kg/m², použito 0,12), před penetrací přebrousit a vysát; na sádrovém podkladu TL doporučuje 2 vrstvy'
+    : 'beton / cementový potěr: ředění 1 díl Primeru G : 2 díly vody; odhad ⚠ – nanáší se cca 0,15 kg/m² roztoku, tj. 0,05 kg/m² koncentrátu';
 
   // 1) příprava
-  add({ id: 'prep', group: 'Příprava podkladu', kind: 'work', code: 'PRAC-004', name: 'Broušení, očištění a odmaštění podkladu', unit: 'm²', qty: A, ok: true });
+  add({ id: 'prep', group: 'Příprava podkladu', kind: 'work', code: 'PRAC-004', name: 'Broušení podkladu vč. ořezu dilatačního pásu', unit: 'm²', qty: A, ok: true });
   add({ id: 'vac', group: 'Příprava podkladu', kind: 'work', code: 'UKL-009', name: 'Přípravný úklid – vysátí prachu', unit: 'm²', qty: A, ok: true });
   let penTotal = 0;
   if (floor && P.uneven) {
@@ -79,7 +90,7 @@ export function plan(P) {
   }
   add({ id: 'pen2', group: 'Penetrace před lepením', kind: 'work', code: 'PRAC-005', name: 'Penetrace podkladu před lepením', unit: 'm²', qty: A * pen, ok: true });
   penTotal += A * pen;
-  add({ id: 'm_pen', group: 'Penetrace před lepením', kind: 'mat', mat: penKey, need: penTotal * penRate * (1 + rs / 100), needUnit: 'kg', name: MAT[penKey].label, ok: true, note: `${penNote}; celkem ${penTotal} m² penetrace` });
+  add({ id: 'm_pen', group: 'Penetrace před lepením', kind: 'mat', mat: penKey, need: penTotal * penRate * (1 + rs / 100), needUnit: 'kg', name: MAT[penKey].label, ok: P.penType === 'nesavy', note: `${penNote}; celkem ${penTotal} m² penetrace` });
 
   // 2) hydroizolace + spád (mokrý provoz)
   if (P.wet) {
@@ -109,14 +120,28 @@ export function plan(P) {
     if (P.prost > 0) { add({ id: 'pr', group: 'Hydroizolace', kind: 'work', code: 'HYDR-008', name: 'Utěsnění prostupů potrubí manžetou', unit: 'ks', qty: P.prost, ok: true }); add({ id: 'm_pr', group: 'Hydroizolace', kind: 'mat', mat: 'manzeta', need: P.prost, needUnit: 'ks', name: MAT.manzeta.label, ok: true, note: 'po 1 ks na prostup' }); }
     add({ id: 'h1', group: 'Hydroizolace', kind: 'work', code: 'HYDR-002', name: 'Tekutá hydroizolace – 1. vrstva', unit: 'm²', qty: hm2, ok: true });
     add({ id: 'h2', group: 'Hydroizolace', kind: 'work', code: 'HYDR-003', name: 'Tekutá hydroizolace – 2. vrstva křížově', unit: 'm²', qty: hm2, ok: true });
-    add({ id: 'm_h', group: 'Hydroizolace', kind: 'mat', mat: 'mapegum', need: hm2 * 1.5 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.mapegum.label, ok: true, note: `TL: cca 1,5 kg/m² na 1 mm, min. tl. 2 mm ve 2 vrstvách → 3 kg/m² × ${r2(hm2)} m²` });
+    const flr = floor ? A : 0;
+    if (flr > 0) {
+      add({ id: 'net', group: 'Hydroizolace', kind: 'work', code: 'HYDR-014', name: 'Zapuštění sklotextilní síťoviny Mapenet 150 do 1. vrstvy', unit: 'm²', qty: flr, ok: true });
+      add({ id: 'm_net', group: 'Hydroizolace', kind: 'mat', mat: 'mapenet', need: flr * 1.1, needUnit: 'bm', name: MAT.mapenet.label, ok: false, note: `TL: role 1 × 50 m, přesah min. 5 cm; ${r2(flr)} m² + 10 % (⚠ přesah je odhad)` });
+      add({ id: 'm_smart', group: 'Hydroizolace', kind: 'mat', mat: 'smart', need: flr * 1.6 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.smart.label, ok: true, note: `podlaha: TL 1,6 kg/m² na 1 mm, min. 2 vrstvy, celkem min. 2 mm → 3,2 kg/m² × ${r2(flr)} m² (sada 30 kg)` });
+    }
+    if (w > 0) add({ id: 'm_h', group: 'Hydroizolace', kind: 'mat', mat: 'mapegum', need: w * 1.5 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.mapegum.label, ok: false, note: `stěny: Mapegum WPS, 2 vrstvy; ⚠ zdroje TL se liší (1,2 kg/m² vs 1,5 kg/m² na 1 mm), použito 3 kg/m² × ${r2(w)} m²` });
     if (P.test) add({ id: 'test', group: 'Hydroizolace', kind: 'work', code: 'HYDR-015', name: 'Zkouška těsnosti hydroizolace (zatopení)', unit: 'kpl', qty: 1, ok: true });
   }
 
   // 3) separace, dilatace
-  if (floor && P.separ) {
+  if (floor && P.sep === 'mapetex') {
     add({ id: 'sep', group: 'Separace', kind: 'work', code: 'SEP-001', name: 'Lepení separační textilie MAPEI Mapetex', unit: 'm²', qty: A, ok: true });
-    add({ id: 'm_sep', group: 'Separace', kind: 'mat', mat: 'mapetex', need: A * 1.1, needUnit: 'm²', name: MAT.mapetex.label, ok: false, note: `${A} m² + 10 % přesahy (⚠ přesah je odhad, role 25 m²)` });
+    add({ id: 'm_sep', group: 'Separace', kind: 'mat', mat: 'mapetex', need: A * 1.1, needUnit: 'm²', name: MAT.mapetex.label, ok: false, note: `${A} m² + 10 % přesahy (⚠ přesah je odhad, role 25 m²; v TL jsem našel jen Mapetex Sel jako výztužnou textilii, ne jako separační vrstvu)` });
+  }
+  if (floor && P.sep === 'wp200') {
+    add({ id: 'sep', group: 'Separace', kind: 'work', code: 'HYDR-004', name: 'Vlepení membrány Mapeguard WP 200', unit: 'm²', qty: A, ok: true });
+    add({ id: 'm_sep', group: 'Separace', kind: 'mat', mat: 'wp200', need: A * 1.1, needUnit: 'm²', name: MAT.wp200.label, ok: false, note: `TL: role 1 m × 30 m / 5 m, přesahy min. 5 cm; ${A} m² + 10 % (⚠ přesah je odhad)` });
+    add({ id: 'm_wpadh', group: 'Separace', kind: 'mat', mat: 'wpadh', need: A * 0.1, needUnit: 'kg', name: MAT.wpadh.label, ok: false, note: 'TL: cca 0,1 kg/m² přesahu (⚠ délka přesahů je odhad)' });
+  }
+  if (floor && P.sep !== 'none') {
+    add({ id: 'm_sepad', group: 'Separace', kind: 'mat', mat: 'ultralite1', need: A * 0.8 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.ultralite1.label + ' – na vlepení separační vrstvy', ok: false, note: 'TL: 0,8 kg/m² na 1 mm; ⚠ tloušťka 2 mm je předpoklad, schválení pro Mapetex v TL nenalezeno (Mapeguard WP 200: TL uvádí Ultralite S1 jako příklad lepidla C2)' });
   }
   if (floor && P.dilatPasek) add({ id: 'edge', group: 'Dilatace', kind: 'work', code: 'HYDR-027', name: 'Okrajový dilatační pásek po obvodu', unit: 'bm', qty: perim, ok: true });
   if (floor && P.dilatPasek) add({ id: 'o_edge', group: 'Dilatace', kind: 'other', need: perim, needUnit: 'bm', name: 'Okrajový dilatační pásek (materiál)', unit: 'bm', qty: perim, ok: false, note: 'není v ceníku MAPEI – doplňte cenu' });
@@ -138,7 +163,13 @@ export function plan(P) {
   }
   add({ id: 'o_kriz', group: 'Lepení', kind: 'other', need: Math.ceil(A * 12), needUnit: 'ks', name: `Vymezovací křížky ${P.joint} mm`, unit: 'ks', qty: Math.ceil(A * 12), ok: false, note: '⚠ odhad 12 ks/m² – nejsou v ceníku, doplňte cenu' });
   if (P.butter) add({ id: 'butter', group: 'Lepení', kind: 'work', code: 'MONT-010', name: 'Příplatek za oboustranné lepení (buttering-floating)', unit: 'm²', qty: A, ok: true });
-  add({ id: 'm_lep', group: 'Lepení', kind: 'mat', mat: 'keraflex', need: A * bed * 1.2 * (1 + rs / 100), needUnit: 'kg', name: MAT.keraflex.label, ok: true, note: `TL: 1,2 kg/m² na 1 mm; lože ${bed} mm (⚠ tloušťka lože je předpoklad) → ${r2(A * bed * 1.2)} kg + rezerva ${rs} %` });
+  const mx = Math.max(Number(P.fa) || 0, Number(P.fb) || 0);
+  const ad = !P.adhesive || P.adhesive === 'auto' ? (mx <= 60 ? 'maxi' : mx <= 120 ? 'ul1' : 'ul2') : P.adhesive;
+  const adMat = { maxi: 'keraflex', extra: 'keraflexX', ul1: 'ultralite1', ul2: 'ultralite2' }[ad];
+  const adKg = ad === 'extra' ? 3 : ad === 'maxi' ? bed * 1.2 : bed * 0.8;
+  const adNote = ad === 'extra' ? 'TL: 2,5–3 kg/m² pro standardní formáty (podle zubu hladítka) – použito 3 kg/m²'
+    : `TL: ${ad === 'maxi' ? '1,2' : '0,8'} kg/m² na 1 mm lože; lože ${bed} mm (⚠ tloušťka lože je předpoklad)`;
+  add({ id: 'm_lep', group: 'Lepení', kind: 'mat', mat: adMat, need: A * adKg * (1 + rs / 100), needUnit: 'kg', name: MAT[adMat].label, ok: true, note: `formát ${P.fa}×${P.fb} cm → ${adNote} → ${r2(A * adKg)} kg + rezerva ${rs} %` });
 
   // 5) spárování
   const C = Number(P.thick) || 9, D = Number(P.joint) || 3;
@@ -147,13 +178,14 @@ export function plan(P) {
   const sprWork = epox ? (Math.max(P.fa, P.fb) >= 120 ? 'SPAR-004' : 'SPAR-003') : 'SPAR-002';
   const gk = epox && !P.epoxPremium ? 'kerapoxy' : 'ultracolor';
   add({ id: 'spar', group: 'Spárování', kind: 'work', code: epox && !P.epoxPremium ? sprWork : 'SPAR-002', name: epox && !P.epoxPremium ? 'Spárování epoxidovou hmotou' : 'Spárování cementovou flexibilní hmotou', unit: 'm²', qty: A, ok: true });
-  add({ id: 'm_spar', group: 'Spárování', kind: 'mat', mat: gk, need: A * kgm2 * (1 + rs / 100), needUnit: 'kg', name: MAT[gk].label, ok: !(gk === 'kerapoxy'), note: `vzorec TL: ((A+B)/(A·B))·C·D·1,6 = ${r2(kgm2)} kg/m² (dlaždice ${a}×${b} mm, tl. ${C}, spára ${D}) → ${r2(A * kgm2)} kg + rezerva ${rs} %${gk === 'kerapoxy' ? ' (⚠ hustota epoxidu 1,6 převzata z cementové hmoty – ověřit v TL Kerapoxy CQ)' : ''}` });
+  add({ id: 'm_spar', group: 'Spárování', kind: 'mat', mat: gk, need: A * kgm2 * (1 + rs / 100), needUnit: 'kg', name: MAT[gk].label, ok: true, note: `vzorec ((A+B)/(A·B))·C·D·1,6 = ${r2(kgm2)} kg/m² (dlaždice ${a}×${b} mm, tl. ${C}, spára ${D}) → ${r2(A * kgm2)} kg + rezerva ${rs} %${gk === 'kerapoxy' ? ' (u Kerapoxy Easy Design jsem v TL našel jen tabulku, ta s tímto vzorcem sedí)' : ''}` });
+  if (epox && !P.epoxPremium) add({ id: 'm_clean', group: 'Spárování', kind: 'mat', mat: 'cleaner', need: Math.ceil(A / 10 * 2), needUnit: 'ks', name: MAT.cleaner.label, ok: true, note: 'dle vaší praxe: 2 × 750 ml na cca 10 m²' });
   if (epox && P.epoxPremium) {
-    add({ id: 'prem', group: 'Spárování', kind: 'premium', name: 'PŘÍPLATEK: epoxidová spárovací hmota Kerapoxy CQ místo cementové (práce + materiál)', unit: 'm²', qty: A, ok: true, workCode: sprWork, kgm2, note: 'Cena = rozdíl epoxid − cement na m²; do nabídky jde jako příplatek v PREMIUM' });
+    add({ id: 'prem', group: 'Spárování', kind: 'premium', name: 'PŘÍPLATEK: epoxidová spárovací hmota Kerapoxy Easy Design místo cementové (práce, materiál, čistič)', unit: 'm²', qty: A, ok: true, workCode: sprWork, kgm2, note: 'Cena = rozdíl epoxid − cement na m²; do nabídky jde jako příplatek v PREMIUM' });
   }
   if (P.sil) {
     add({ id: 'sil', group: 'Spárování', kind: 'work', code: 'SPAR-005', name: 'Sanitární silikon v koutech a dilatacích', unit: 'bm', qty: perim + dil, ok: true });
-    add({ id: 'm_sil', group: 'Spárování', kind: 'mat', mat: 'mapesil', need: Math.ceil((perim + dil) / 12.4), needUnit: 'ks', name: MAT.mapesil.label, ok: true, note: 'TL: kartuš 310 ml ≈ 12 bm spáry 5×5 mm' });
+    add({ id: 'm_sil', group: 'Spárování', kind: 'mat', mat: P.silType === 'lm' ? 'mapesilLM' : 'mapesil', need: Math.ceil((perim + dil) / 12.4), needUnit: 'ks', name: (P.silType === 'lm' ? MAT.mapesilLM : MAT.mapesil).label, ok: true, note: 'TL: kartuš 310 ml ≈ 12 bm spáry 5×5 mm' });
   }
   // 6) úklid
   add({ id: 'cl1', group: 'Úklid', kind: 'work', code: 'UKL-001', name: 'Předběžné čištění po spárování', unit: 'm²', qty: A, ok: true });

@@ -48,10 +48,14 @@ export function buildRows(P) {
       o.row = { typ: 'ostatni', name: l.name, unit: l.unit, qty: l.qty, price: '', disc: 0 };
     } else if (l.kind === 'premium') {
       const wk = workItem(l.workCode), wc = workItem('SPAR-002');
-      const ker = resolveMat({ mat: 'kerapoxy', need: (lines.find((x) => x.id === 'm_spar') || {}).need || 0 }, P);
+      const need0 = (lines.find((x) => x.id === 'm_spar') || {}).need || 0;
+      const ker = resolveMat({ mat: 'kerapoxy', need: need0 }, P);
+      const cl = resolveMat({ mat: 'cleaner', need: Math.ceil(l.qty / 10 * 2) }, P);
+      const u2 = workItem('UKL-002'), u4 = workItem('UKL-004');
       const ult = resolveMat({ mat: 'ultracolor', need: (lines.find((x) => x.id === 'm_spar') || {}).need || 0 }, P);
       if (wk && wc && ker && ult) {
-        const price = Math.round(((priceFor(wk, l.qty) - priceFor(wc, l.qty)) * l.qty + ker.cost - ult.cost) / l.qty);
+        const uk = u2 && u4 ? (priceFor(u2, l.qty) - priceFor(u4, l.qty)) * l.qty : 0;
+        const price = Math.round(((priceFor(wk, l.qty) - priceFor(wc, l.qty)) * l.qty + uk + ker.cost + (cl ? cl.cost : 0) - ult.cost) / l.qty);
         o.row = { typ: 'ostatni', name: l.name, unit: 'm²', qty: l.qty, price, disc: 0, premium: true };
       } else { o.miss = 'Příplatek za epoxid nelze spočítat (chybí položka v ceníku) – zadejte cenu ručně'; o.row = { typ: 'ostatni', name: l.name, unit: 'm²', qty: l.qty, price: '', disc: 0, premium: true }; }
     }
@@ -97,10 +101,10 @@ export function openGuide({ item, row, onDone }) {
   };
   let lastRows = [];
   const num_ = (key, label, extra = {}) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label),
-    h('input', { type: 'text', inputmode: 'decimal', class: 'num', value: P[key] ?? '', placeholder: extra.ph || '', oninput: (e) => { P[key] = e.target.value === '' ? '' : num(e.target.value); redraw(); } }));
+    h('input', { type: 'text', inputmode: 'decimal', class: 'num', 'data-k': key, value: P[key] ?? '', placeholder: extra.ph || '', oninput: (e) => { P[key] = e.target.value === '' ? '' : num(e.target.value); redraw(); } }));
   const chk = (key, label, after) => h('label', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, h('input', { type: 'checkbox', style: { width: 'auto' }, checked: !!P[key], onchange: (e) => { P[key] = e.target.checked; if (after) after(); redraw(); } }), label);
-  const sel = (key, label, opts) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label),
-    h('select', { onchange: (e) => { P[key] = e.target.value; redraw(); } }, opts.map(([v, t]) => h('option', { value: v, selected: P[key] === v }, t))));
+  const sel = (key, label, opts, after) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label),
+    h('select', { onchange: (e) => { P[key] = e.target.value; if (after) after(); redraw(); } }, opts.map(([v, t]) => h('option', { value: v, selected: P[key] === v }, t))));
   const colors = colorOptions();
   if (colors.length && !colors.some(([c]) => c === P.groutColor)) P.groutColor = colors[0][0];
   const wetBox = h('div', { class: 'grid c2', style: { marginTop: '6px' } });
@@ -119,11 +123,13 @@ export function openGuide({ item, row, onDone }) {
       h('div', { class: 'grid c3' },
         num_('A', 'Plocha (m²)'), num_('fa', 'Formát – strana A (cm)'), num_('fb', 'Formát – strana B (cm)'),
         num_('thick', 'Tloušťka dlaždice (mm)'), num_('joint', 'Šířka spáry (mm)'), num_('perim', 'Obvod (bm) – prázdné = odhad'),
-        num_('bedT', 'Tloušťka lepicího lože (mm)'), num_('penLayers', 'Počet vrstev penetrace'), sel('penType', 'Podklad', [['savy', 'savý (beton, cementový potěr) – Primer G'], ['nesavy', 'nesavý (starý obklad, hladký) – Eco Prim Grip Plus']])),
+        num_('bedT', 'Tloušťka lepicího lože (mm)'), num_('penLayers', 'Počet vrstev penetrace'), sel('penType', 'Podklad', [['beton', 'beton / cementový potěr – Primer G 1:2'], ['anhydrit', 'anhydrit – Primer G neředěný'], ['nesavy', 'nesavý (starý obklad) – Eco Prim Grip Plus']], () => { P.penLayers = P.penType === 'anhydrit' ? 2 : 1; const i = dlg.querySelector('[data-k="penLayers"]'); if (i) i.value = P.penLayers; })),
       h('div', { class: 'grid c2', style: { marginTop: '8px' } },
         mode === 'podlaha' ? chk('uneven', 'Podklad je nerovný – nivelační stěrka', () => { redraw(); }) : null,
         mode === 'podlaha' ? num_('nivT', 'Nivelace – tloušťka (mm, 1–10)') : null,
-        mode === 'podlaha' ? chk('separ', 'Separační textilie Mapetex (velký formát)') : null,
+        mode === 'podlaha' ? sel('sep', 'Separační vrstva', [['none', 'bez separace'], ['mapetex', 'Mapetex SEL N (textilie)'], ['wp200', 'Mapeguard WP 200 (membrána)']]) : null,
+        sel('adhesive', 'Lepidlo', [['auto', 'automaticky podle formátu'], ['maxi', 'Keraflex Maxi S1'], ['extra', 'Keraflex Extra S1'], ['ul1', 'Ultralite S1 Flex'], ['ul2', 'Ultralite S2 Flex']]),
+        sel('silType', 'Silikon', [['ac', 'Mapesil AC (kyselý)'], ['lm', 'Mapesil LM (neutrální)']]),
         chk('spony', 'Nivelační spony + klínky + křížky'),
         mode === 'podlaha' ? chk('butter', 'Oboustranné lepení (buttering-floating)') : null,
         mode === 'podlaha' ? chk('dilatPasek', 'Okrajový dilatační pásek') : null,
@@ -131,7 +137,7 @@ export function openGuide({ item, row, onDone }) {
         mode === 'podlaha' ? num_('stripBm', 'Spáry z podkladu k přenesení (bm)') : null,
         chk('sil', 'Silikon v koutech a dilatacích')),
       h('div', { class: 'grid c3', style: { marginTop: '8px' } },
-        sel('grout', 'Spárování', [['cement', 'cementová – Ultracolor Plus'], ['epoxid', 'epoxidová – Kerapoxy CQ']]),
+        sel('grout', 'Spárování', [['cement', 'cementová – Ultracolor Plus'], ['epoxid', 'epoxidová – Kerapoxy Easy Design']]),
         sel('groutColor', 'Odstín spáry', colors.length ? colors.map(([c, n]) => [c, `${c} ${n}`]) : [['113', '113']]),
         h('div', null, chk('epoxPremium', 'Epoxid jako příplatek v PREMIUM'))),
       h('div', { style: { marginTop: '8px' } }, chk('wet', 'Koupelna / sprchový kout (hydroizolace, spád)', () => { drawWet(); }), wetBox),
