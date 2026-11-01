@@ -113,7 +113,7 @@ export function openGuide({ item, row, onDone }) {
     if (!P.wet) return;
     wetBox.append(num_('wetWalls', 'Hydroizolace na stěnách (m²)', { ph: 'např. sprchový kout 6' }), num_('slopeA', 'Spádování – plocha sprchy (m²)'), num_('slopeT', 'Spádový potěr – průměrná tl. (cm)'),
       sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'sprchový žlab'], ['vpust', 'bodová vpusť']]), num_('drainLen', 'Délka žlabu (bm)'),
-      num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), num_('prost', 'Prostupů potrubí (ks)'), chk('test', 'Zkouška těsnosti (zatopení)'));
+      sel('hydro', 'Hydroizolace podlahy', [['smart', 'cementová Mapelastic Smart'], ['wp200', 'folie Mapeguard WP 200']]), sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]), num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), num_('prost', 'Prostupů potrubí (ks)'), chk('test', 'Zkouška těsnosti (zatopení)'));
   };
   drawWet();
   const dlg = h('div', { class: 'modal-back', style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' } },
@@ -127,7 +127,7 @@ export function openGuide({ item, row, onDone }) {
       h('div', { class: 'grid c2', style: { marginTop: '8px' } },
         mode === 'podlaha' ? chk('uneven', 'Podklad je nerovný – nivelační stěrka', () => { redraw(); }) : null,
         mode === 'podlaha' ? num_('nivT', 'Nivelace – tloušťka (mm, 1–10)') : null,
-        mode === 'podlaha' ? sel('sep', 'Separační vrstva', [['none', 'bez separace'], ['mapetex', 'Mapetex SEL N (textilie)'], ['wp200', 'Mapeguard WP 200 (membrána)']]) : null,
+        mode === 'podlaha' ? sel('sep', 'Separační vrstva (ne v koupelně s folií)', [['none', 'bez separace'], ['mapetex', 'Mapetex SEL N (textilie)'], ['wp200', 'Mapeguard WP 200 (folie)']]) : null,
         sel('adhesive', 'Lepidlo', [['auto', 'automaticky podle formátu'], ['maxi', 'Keraflex Maxi S1'], ['extra', 'Keraflex Extra S1'], ['ul1', 'Ultralite S1 Flex'], ['ul2', 'Ultralite S2 Flex']]),
         sel('silType', 'Silikon', [['ac', 'Mapesil AC (kyselý)'], ['lm', 'Mapesil LM (neutrální)']]),
         chk('spony', 'Nivelační spony + klínky + křížky'),
