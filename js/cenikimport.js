@@ -239,6 +239,14 @@ function showPracePlan(pl, done) {
   document.body.appendChild(dlg);
 }
 
+export async function openBundledPrace(done) {
+  try {
+    toast('Načítám ceník z aplikace…');
+    const r = await fetch('data/cenik-praci-2026.xlsx', { cache: 'no-cache' }); if (!r.ok) throw new Error('Ceník v aplikaci se nepodařilo načíst.');
+    showPracePlan(planPrace(parsePrace(await readWorkbook(await r.arrayBuffer()))), done);
+  } catch (er) { toast(er.message || String(er), 'err'); }
+}
+
 export function importButtons(cat, done) {
   if (cat === 'prace') {
     const file = h('input', { type: 'file', accept: '.xlsx,.xls', style: { display: 'none' }, onchange: async (e) => {
@@ -250,13 +258,7 @@ export function importButtons(cat, done) {
         showPracePlan(planPrace(inc), done);
       } catch (er) { toast(er.message || String(er), 'err'); }
     } });
-    const bundled = h('button', { class: 'btn gold small', onclick: async () => {
-      try {
-        toast('Načítám ceník z aplikace…');
-        const r = await fetch('data/cenik-praci-2026.xlsx', { cache: 'no-cache' }); if (!r.ok) throw new Error('Ceník v aplikaci se nepodařilo načíst.');
-        showPracePlan(planPrace(parsePrace(await readWorkbook(await r.arrayBuffer()))), done);
-      } catch (er) { toast(er.message || String(er), 'err'); }
-    } }, 'Načíst ceník prací 2026 (z aplikace)');
+    const bundled = h('button', { class: 'btn gold small', onclick: () => openBundledPrace(done) }, 'Načíst ceník prací 2026 (z aplikace)');
     const already = S.prices.some((p) => p.code === 'PRI-001');
     return h('span', { style: { display: 'inline-flex', gap: '6px', flexWrap: 'wrap' } },
       already ? null : bundled,

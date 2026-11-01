@@ -5,6 +5,7 @@ import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { settlementEditor, invoiceEditor } from './vyuctovani.js';
 import { prehledView } from './prehled.js';
+import { openBundledPrace } from './cenikimport.js';
 import { orderView } from './objednavka.js';
 import { ziskView } from './ziskovost.js';
 import { skladView } from './sklad.js';
@@ -89,7 +90,7 @@ async function route() {
   const bkBanner = (days === null || days >= 7) && !S.offline ? h('div', { class: 'banner' }, h('span', null, days === null ? 'Data ještě nebyla zálohována. ' : `Poslední záloha byla před ${days} dny. `),
     h('button', { class: 'btn small gold', onclick: async (e) => { e.target.disabled = true; try { const r = await backupToDrive(); toast('Záloha uložena na Disk: ' + r.name); bkBanner.remove(); } catch (er) { toast(er.message, 'err'); e.target.disabled = false; } } }, 'Zálohovat teď')) : null;
   app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, bkBanner, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
-  if (!S.offline) dueBanner(main);
+  if (!S.offline) { dueBanner(main); priceBanner(main); }
   stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
@@ -142,4 +143,16 @@ async function dueBanner(main) {
       h('button', { class: 'btn small ghost', onclick: () => el.remove() }, '×'));
     main.parentNode.insertBefore(el, main);
   } catch (_) { /* upozornění je jen doplněk */ }
+}
+
+// Nabídka jedním klepnutím načíst nový ceník prací 2026 (dokud v databázi chybí).
+function priceBanner(main) {
+  try {
+    if (S.prices.some((p) => p.code === 'PRI-001') || sessionStorage.getItem('noPriceBanner')) return;
+    const el = h('div', { class: 'banner' },
+      h('span', null, 'Je připraven nový ceník prací 2026 (550 položek s poznámkami). '),
+      h('button', { class: 'btn small gold', onclick: () => openBundledPrace(() => { el.remove(); route(); }) }, 'Načíst'),
+      h('button', { class: 'btn small ghost', onclick: () => { try { sessionStorage.setItem('noPriceBanner', '1'); } catch (_) {} el.remove(); } }, '×'));
+    main.parentNode.insertBefore(el, main);
+  } catch (_) {}
 }

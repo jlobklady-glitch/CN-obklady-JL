@@ -4,6 +4,7 @@ import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, disp
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
 import { itemsEditor } from './items.js';
+import { guideApplies, openGuide } from './pruvodce.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 
 const stavCls = { 'Dokončena': 'ok', 'Zamítnuta': 'bad', 'Potvrzena': 'blue', 'V realizaci': 'blue', 'Nabídka zaslána': 'gold' };
@@ -61,7 +62,15 @@ export async function quoteEditor(root, id) {
   } }, h('option', { value: '' }, '— vybrat z kontaktů / vyplnit ručně —'), S.contacts.map((c) => h('option', { value: c.id, selected: c.id === q.customer_id }, `${c.name} (${c.kind})`)));
   showIds();
 
-  const ed = itemsEditor(q.items, touch);
+  const ed = itemsEditor(q.items, touch, (p, r) => {
+    if (!guideApplies(p)) return;
+    openGuide({ item: p, row: r, onDone: ({ base, prem, area }) => {
+      if (!(parseNum(r.qty) > 1)) r.qty = area;
+      const at = q.items.indexOf(r) + 1; q.items.splice(at, 0, ...base);
+      if (prem.length) { q.premium = true; q.premium_items = q.premium_items || []; q.premium_items.push(...prem); }
+      ed.redraw(); touch(); drawPremium();
+    } });
+  });
   const itemsBox = ed.box, totalV = ed.totalV;
 
   // --- varianta Premium

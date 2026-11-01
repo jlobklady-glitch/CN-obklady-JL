@@ -33,7 +33,7 @@ export function suggestBox(input, onPick, filter = () => true) {
 }
 
 // items: pole řádků (upravuje se přímo), onTouch: volá se po každé změně
-export function itemsEditor(items, onTouch) {
+export function itemsEditor(items, onTouch, onPick) {
   const box = h('div', { class: 'items' });
   const totalV = h('div', { class: 'v' });
   const recalc = () => { totalV.textContent = kc(quoteTotal(items)); };
@@ -64,6 +64,7 @@ export function itemsEditor(items, onTouch) {
       nameIn.value = r.name; grow(nameIn); unitIn.value = r.unit; priceIn.value = r.price; qtyIn.value = r.qty;
       [...typSel.options].forEach((o) => { o.selected = o.text === typeLabel(r.typ); });
       upd();
+      if (onPick) onPick(p, r);
     });
     return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug), h('div', { class: 'c-mj', 'data-l': 'MJ' }, unitIn),
       h('div', { class: 'c-qty', 'data-l': 'Množství' }, qtyIn), h('div', { class: 'c-price', 'data-l': 'Cena / MJ' }, priceIn), h('div', { class: 'c-disc', 'data-l': 'Sleva %' }, discIn), tot,
