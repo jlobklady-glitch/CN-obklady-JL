@@ -124,11 +124,11 @@ export function plan(P) {
     penTotal += A * pen;
     const la = Number(P.levA) || A, lt = Number(P.levT) || 3;
     if (P.levType === 'malta') {
-      add({ id: 'lev', group: 'Vyrovnání stěny', kind: 'work', code: lt <= 10 ? 'ZEDN-005' : 'ZEDN-006', name: lt <= 10 ? 'Vyrovnání stěn jádrovou omítkou / stěrkou do 10 mm' : 'Vyrovnání stěn lokální do 20 mm', unit: 'm²', qty: la, ok: lt <= 20, note: lt > 20 ? 'nad 20 mm už v ceníku není položka – upravte ručně' : undefined });
-      add({ id: 'o_lev', group: 'Vyrovnání stěny', kind: 'other', need: Math.ceil(la * lt * 1.6), needUnit: 'kg', name: 'Vyrovnávací malta PCI K01 (materiál)', unit: 'kg', qty: Math.ceil(la * lt * 1.6), ok: false, note: `není v ceníku – doplňte cenu; množství jen orientační (⚠ 1,6 kg/m² na 1 mm × ${r2(la)} m² × ${lt} mm)` });
+      add({ id: 'wlev', group: 'Vyrovnání stěny', kind: 'work', code: lt <= 10 ? 'ZEDN-005' : 'ZEDN-006', name: lt <= 10 ? 'Vyrovnání stěn jádrovou omítkou / stěrkou do 10 mm' : 'Vyrovnání stěn lokální do 20 mm', unit: 'm²', qty: la, ok: lt <= 20, note: lt > 20 ? 'nad 20 mm už v ceníku není položka – upravte ručně' : undefined });
+      add({ id: 'o_wlev', group: 'Vyrovnání stěny', kind: 'other', need: Math.ceil(la * lt * 1.6), needUnit: 'kg', name: 'Vyrovnávací malta PCI K01 (materiál)', unit: 'kg', qty: Math.ceil(la * lt * 1.6), ok: false, note: `není v ceníku – doplňte cenu; množství jen orientační (⚠ 1,6 kg/m² na 1 mm × ${r2(la)} m² × ${lt} mm)` });
     } else {
-      add({ id: 'lev', group: 'Vyrovnání stěny', kind: 'work', code: 'ZDN-043', name: 'Dorovnání podkladu stěrkovým lepidlem (do 5 mm)', unit: 'm²', qty: la, ok: lt <= 5, note: lt > 5 ? 'stěrkovým lepidlem jen do 5 mm – při větší tloušťce zvolte maltu' : undefined });
-      add({ id: 'm_lev', group: 'Vyrovnání stěny', kind: 'mat', mat: 'keraflex', need: la * lt * 1.2 * (1 + rs / 100), needUnit: 'kg', name: MAT.keraflex.label + ' – stěrkově na vyrovnání', ok: true, note: `TL: 1,2 kg/m² na 1 mm; ${r2(la)} m² × ${lt} mm + rezerva ${rs} %` });
+      add({ id: 'wlev', group: 'Vyrovnání stěny', kind: 'work', code: 'ZDN-043', name: 'Dorovnání podkladu stěrkovým lepidlem (do 5 mm)', unit: 'm²', qty: la, ok: lt <= 5, note: lt > 5 ? 'stěrkovým lepidlem jen do 5 mm – při větší tloušťce zvolte maltu' : undefined });
+      add({ id: 'm_wlev', group: 'Vyrovnání stěny', kind: 'mat', mat: 'keraflex', need: la * lt * 1.2 * (1 + rs / 100), needUnit: 'kg', name: MAT.keraflex.label + ' – stěrkově na vyrovnání', ok: true, note: `TL: 1,2 kg/m² na 1 mm; ${r2(la)} m² × ${lt} mm + rezerva ${rs} %` });
     }
   }
   if (floor || P.levOn) add({ id: 'pen2', group: floor ? 'Penetrace před lepením' : 'Penetrace po vyrovnání', kind: 'work', code: 'PRAC-005', name: floor ? 'Penetrace podkladu před lepením' : 'Penetrace podkladu po vyrovnání', unit: 'm²', qty: A * pen, ok: true });
