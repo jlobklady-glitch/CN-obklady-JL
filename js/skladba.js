@@ -40,6 +40,8 @@ export const MAT = {
 // spony PROWDG C podle šířky spáry (v ceníku: 0,5 / 1,0 / 1,5 / 2,0 / 3,0 / 4,0 / 5,0 mm)
 export const sponaRe = (joint) => new RegExp('MAPELEVEL\\s+PROWDG\\s+SPONY\\s+C\\s+' + String(joint).replace('.', '[,.]').replace(/^(\d)$/, '$1[,.]0') + '\\s*mm', 'i');
 
+export const PC_SIZES = [[10, 24], [15, 38], [28, 50], [50, 75], [75, 110], [100, 130]];
+
 export const parseFormat = (name) => {
   const all = [...String(name || '').matchAll(/(\d{2,3})\s*[x×]\s*(\d{2,3})/gi)].map((m) => [Number(m[1]), Number(m[2])]);
   if (!all.length) return null;
@@ -127,13 +129,21 @@ export function plan(P) {
     }
     if (P.corIn > 0) { add({ id: 'ci', group: 'Hydroizolace', kind: 'work', code: 'HYDR-006', name: 'Těsnicí vnitřní rohy', unit: 'ks', qty: P.corIn, ok: true }); add({ id: 'm_ci', group: 'Hydroizolace', kind: 'mat', mat: 'bandIn', need: P.corIn, needUnit: 'ks', name: MAT.bandIn.label, ok: true, note: 'po 1 ks na roh' }); }
     if (P.corOut > 0) { add({ id: 'co', group: 'Hydroizolace', kind: 'work', code: 'HYDR-007', name: 'Těsnicí vnější rohy', unit: 'ks', qty: P.corOut, ok: true }); add({ id: 'm_co', group: 'Hydroizolace', kind: 'mat', mat: 'bandOut', need: P.corOut, needUnit: 'ks', name: MAT.bandOut.label, ok: true, note: 'po 1 ks na roh' }); }
-    // prostupy: „ks × průměr mm“, manžeta podle průměru (⚠ MAPEI průměry v TL neuvádí: do ø 50 mm manžeta 200×200, větší 400×400)
+    // prostupy: „ks × průměr mm“ → manžeta Mapeguard PC podle rozsahu otvoru v názvu (10-24, 15-38, 28-50, 50-75, 75-110, 100-130 mm)
     const pr = [...String(P.prostText || '').matchAll(/(\d+)\s*[x×*]\s*(\d+)/gi)].map((m) => ({ n: Number(m[1]), d: Number(m[2]) }));
-    const small = pr.filter((x) => x.d <= 50).reduce((t, x) => t + x.n, 0), big = pr.filter((x) => x.d > 50).reduce((t, x) => t + x.n, 0);
-    if (small + big > 0) {
-      add({ id: 'pr', group: 'Hydroizolace', kind: 'work', code: 'HYDR-008', name: 'Utěsnění prostupů potrubí manžetou', unit: 'ks', qty: small + big, ok: true });
-      if (small) add({ id: 'm_pr', group: 'Hydroizolace', kind: 'mat', mat: 'manzeta', need: small, needUnit: 'ks', name: MAT.manzeta.label, ok: false, note: `${small} ks prostupů do ø 50 mm (⚠ hranice ø není z TL)` });
-      if (big) add({ id: 'm_pr4', group: 'Hydroizolace', kind: 'mat', mat: 'manzeta4', need: big, needUnit: 'ks', name: MAT.manzeta4.label, ok: false, note: `${big} ks prostupů nad ø 50 mm (⚠ hranice ø není z TL)` });
+    const bySize = new Map(); let prTotal = 0;
+    for (const x of pr) {
+      prTotal += x.n;
+      const sz = PC_SIZES.filter(([lo, hi]) => x.d >= lo && x.d <= hi).sort((u, v) => u[1] - v[1])[0];
+      const key = sz ? sz.join('-') : 'jiny' + x.d;
+      const e = bySize.get(key) || { sz, d: x.d, n: 0 }; e.n += x.n; bySize.set(key, e);
+    }
+    if (prTotal > 0) {
+      add({ id: 'pr', group: 'Hydroizolace', kind: 'work', code: 'HYDR-008', name: 'Utěsnění prostupů potrubí manžetou', unit: 'ks', qty: prTotal, ok: true });
+      for (const [key, e] of bySize) {
+        if (e.sz) add({ id: 'm_pc' + key, group: 'Hydroizolace', kind: 'mat', re: new RegExp('MAPEGUARD\\s+PC\\s+' + e.sz[0] + '-' + e.sz[1] + '\\s*mm', 'i'), need: e.n, needUnit: 'ks', name: `MAPEI Mapeguard PC ${e.sz[0]}–${e.sz[1]} mm (manžeta prostupu)`, ok: true, note: `${e.n} ks pro prostup ø ${e.d} mm – manžeta podle rozsahu otvoru v názvu` });
+        else add({ id: 'o_pc' + key, group: 'Hydroizolace', kind: 'other', name: `Manžeta prostupu ø ${e.d} mm – mimo rozsah Mapeguard PC (10–130 mm)`, unit: 'ks', qty: e.n, need: e.n, needUnit: 'ks', ok: false, note: 'zvolte manžetu ručně' });
+      }
     }
     add({ id: 'h1', group: 'Hydroizolace', kind: 'work', code: 'HYDR-002', name: 'Tekutá hydroizolace – 1. vrstva', unit: 'm²', qty: hm2 - wpA, ok: true });
     add({ id: 'h2', group: 'Hydroizolace', kind: 'work', code: 'HYDR-003', name: 'Tekutá hydroizolace – 2. vrstva křížově', unit: 'm²', qty: hm2 - wpA, ok: true });

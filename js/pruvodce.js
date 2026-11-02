@@ -19,7 +19,7 @@ function colorOptions() {
 }
 
 export function resolveMat(l, P) {
-  const re = l.mat ? MAT[l.mat].re : sponaRe(l.joint);
+  const re = l.re || (l.mat ? MAT[l.mat].re : sponaRe(l.joint));
   const spec = l.mat ? MAT[l.mat] : {};
   let c = S.prices.filter((p) => p.category === 'mapei' && p.active !== false && re.test(String(p.name)));
   if (spec.color) { const k = new RegExp('\\s' + P.groutColor + '\\s'); const cc = c.filter((p) => k.test(String(p.name))); c = cc; }
