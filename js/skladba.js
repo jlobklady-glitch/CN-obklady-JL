@@ -22,7 +22,8 @@ export const MAT = {
   wpadh:     { re: /^MAPEGUARD\s+WP\s+ADHESIVE\s*$/i, label: 'MAPEI Mapeguard WP Adhesive (lepení přesahů)' },
   cleaner:   { re: /KERAPOXY\s+CLEANER\s+SPRAY/i, label: 'MAPEI UltraCare Kerapoxy Cleaner Spray 0,75 l' },
   mapesilLM: { re: /MAPESIL\s+LM/i, label: 'MAPEI Mapesil LM (neutrální silikon)', color: true },
-  mapetex:   { re: /MAPETEX\s+SEL\s+N/i, label: 'MAPEI Mapetex SEL N (separační textilie)' },
+  mapetex:   { re: /^MAPETEX\s+\(1\s*m\s*x\s*50/i, label: 'MAPEI Mapetex (bílá netkaná textilie, systém proti trhlinám)' },
+  mapetexSel:{ re: /MAPETEX\s+SEL\s+N/i, label: 'MAPEI Mapetex SEL N (výztuž hydroizolace)' },
   ultracolor:{ re: /ULTRACOLOR\s+PLUS/i, label: 'MAPEI Ultracolor Plus (cementová spárovací hmota)', color: true, minPack: 5 },
   kerapoxy:  { re: /KERAPOXY\s+EASY\s+DESIGN/i, label: 'MAPEI Kerapoxy Easy Design (epoxidová spárovací hmota)', color: true },
   mapesil:   { re: /MAPESIL\s+AC\s+ZERO/i, label: 'MAPEI Mapesil AC Zero (silikon)', color: true },
@@ -128,7 +129,7 @@ export function plan(P) {
       add({ id: 'm_wpl', group: 'Hydroizolace', kind: 'mat', mat: 'ultralite1', need: flr * 0.8 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.ultralite1.label + ' – na vlepení folie', ok: false, note: 'TL Mapeguard WP 200 uvádí Ultralite S1 jako příklad lepidla C2; ⚠ lože 2 mm je předpoklad' });
     } else if (flr > 0 && P.hyReinf === 'sel') {
       add({ id: 'net', group: 'Hydroizolace', kind: 'work', code: 'HYDR-014', name: 'Zapuštění výztužné textilie do 1. vrstvy hydroizolace', unit: 'm²', qty: flr, ok: true });
-      add({ id: 'm_net', group: 'Hydroizolace', kind: 'mat', mat: 'mapetex', need: flr * 1.1, needUnit: 'm²', name: MAT.mapetex.label + ' – výztuž hydroizolace', ok: false, note: `TL: netkaná polypropylenová textilie pro vyztužení hydroizolace; ⚠ přesah v TL nenalezen, počítáno +10 %` });
+      add({ id: 'm_net', group: 'Hydroizolace', kind: 'mat', mat: 'mapetexSel', need: flr * 1.1, needUnit: 'm²', name: MAT.mapetexSel.label, ok: false, note: `TL: netkaná polypropylenová textilie pro vyztužení hydroizolace; ⚠ přesah v TL nenalezen, počítáno +10 %` });
     } else if (flr > 0) {
       add({ id: 'net', group: 'Hydroizolace', kind: 'work', code: 'HYDR-014', name: 'Zapuštění sklotextilní síťoviny Mapenet 150 do 1. vrstvy', unit: 'm²', qty: flr, ok: true });
       add({ id: 'm_net', group: 'Hydroizolace', kind: 'mat', mat: 'mapenet', need: flr * 1.1, needUnit: 'bm', name: MAT.mapenet.label, ok: true, note: `TL: role 1 × 50 m, přesah min. 5 cm; ${r2(flr)} m² + 10 % přesahy a odpad` });
@@ -144,7 +145,7 @@ export function plan(P) {
   const sepOn = floor && !(P.wet && P.hydro === 'wp200');
   if (sepOn && P.sep === 'mapetex') {
     add({ id: 'sep', group: 'Separace', kind: 'work', code: 'SEP-001', name: 'Lepení separační textilie MAPEI Mapetex', unit: 'm²', qty: A, ok: true });
-    add({ id: 'm_sep', group: 'Separace', kind: 'mat', mat: 'mapetex', need: A * 1.1, needUnit: 'm²', name: MAT.mapetex.label, ok: false, note: `${A} m² + 10 % (role 25 m²); ⚠ v TL je Mapetex Sel N popsán jako textilie pro vyztužení hydroizolací, ne jako samostatná separace; přesah v TL nenalezen` });
+    add({ id: 'm_sep', group: 'Separace', kind: 'mat', mat: 'mapetex', need: A * 1.1, needUnit: 'm²', name: MAT.mapetex.label, ok: false, note: `${A} m² + 10 % (role 1 × 50 m); textilie přemosťuje trhliny v podkladu, aby nebylo nutné dělat dilatace v dlažbě (Mapetex System: bílá netkaná textilie 1 m × 50 m); ⚠ postup lepení a přesahy v TL nenalezeny` });
   }
   if (sepOn && P.sep === 'wp200') {
     add({ id: 'sep', group: 'Separace', kind: 'work', code: 'HYDR-004', name: 'Vlepení membrány Mapeguard WP 200', unit: 'm²', qty: A, ok: true });

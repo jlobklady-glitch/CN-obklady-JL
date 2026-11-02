@@ -127,7 +127,7 @@ export function openGuide({ item, row, onDone }) {
       h('div', { class: 'grid c2', style: { marginTop: '8px' } },
         mode === 'podlaha' ? chk('uneven', 'Podklad je nerovný – nivelační stěrka', () => { redraw(); }) : null,
         mode === 'podlaha' ? num_('nivT', 'Nivelace – tloušťka (mm, 1–10)') : null,
-        mode === 'podlaha' ? sel('sep', 'Separační vrstva (ne v koupelně s folií)', [['none', 'bez separace'], ['mapetex', 'Mapetex SEL N (textilie)'], ['wp200', 'Mapeguard WP 200 (folie)']]) : null,
+        mode === 'podlaha' ? sel('sep', 'Separační vrstva (ne v koupelně s folií)', [['none', 'bez separace'], ['mapetex', 'Mapetex (textilie proti trhlinám)'], ['wp200', 'Mapeguard WP 200 (folie)']]) : null,
         sel('adhesive', 'Lepidlo', [['auto', 'automaticky podle formátu'], ['maxi', 'Keraflex Maxi S1'], ['extra', 'Keraflex Extra S1'], ['ul1', 'Ultralite S1 Flex'], ['ul2', 'Ultralite S2 Flex']]),
         sel('silType', 'Silikon', [['ac', 'Mapesil AC (kyselý)'], ['lm', 'Mapesil LM (neutrální)']]),
         chk('spony', 'Nivelační spony + klínky + křížky'),
