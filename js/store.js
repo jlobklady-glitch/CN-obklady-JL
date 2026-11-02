@@ -161,6 +161,14 @@ export async function deleteContact(id) {
 }
 
 // ---------- ceníky ----------
+// uloží jen jedno změněné pole (starší kopie ceníku v telefonu nepřepíše cizí změny ostatních polí)
+export async function patchPrice(p, k, v) {
+  const val = (k === 'price' || k === 'pack') ? parseNum(v) : v;
+  const { data, error } = await sb.from('price_items').update({ [k]: k === 'pack' ? (val || 1) : val }).eq('id', p.id).select().single();
+  if (error) throw error;
+  const i = S.prices.findIndex((x) => x.id === data.id); if (i >= 0) S.prices[i] = data;
+  Object.assign(p, data);
+}
 export async function savePrice(p) {
   const row = { category: p.category, code: p.code || '', name: p.name, unit: p.unit || '', price: parseNum(p.price), pack: parseNum(p.pack) || 1, extra: p.extra || {}, active: p.active !== false };
   let res;
@@ -212,10 +220,19 @@ export const lineTotal = (r) => {
 export const quoteTotal = (items) => items.reduce((s, r) => s + lineTotal(r), 0);
 
 // ---------- nabídky ----------
+// stránkování po 1000 řádcích (limit Supabase)
+async function pageAll(make) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await make().range(from, from + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out;
+}
 export async function listQuotes() {
-  const { data, error } = await sb.from('quotes').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false });
-  if (error) throw error;
-  return data;
+  return pageAll(() => sb.from('quotes').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false }).order('id'));
 }
 export async function getQuote(id) {
   const { data, error } = await sb.from('quotes').select('*').eq('id', id).single();
@@ -224,8 +241,7 @@ export async function getQuote(id) {
 }
 export async function nextQuoteNumber() {
   const yr = new Date().getFullYear();
-  const { data, error } = await sb.from('quotes').select('number').like('number', `CN-${yr}-%`);
-  if (error) throw error;
+  const data = await pageAll(() => sb.from('quotes').select('number').like('number', `CN-${yr}-%`).order('number'));
   let mx = 0;
   for (const r of data) { const n = parseInt(r.number.split('-')[2], 10); if (n > mx) mx = n; }
   return `CN-${yr}-${String(mx + 1).padStart(3, '0')}`;
@@ -279,7 +295,7 @@ export async function deleteQuote(id) {
 export async function duplicateQuote(q) {
   for (let i = 0; ; i++) {
     const number = await nextQuoteNumber();
-    const row = { ...q, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno' };
+    const row = { ...q, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno', settlement: {} };
     delete row.id; delete row.created_at; delete row.updated_at;
     const { data, error } = await sb.from('quotes').insert(row).select().single();
     if (!error) return data;
@@ -291,7 +307,8 @@ export async function duplicateQuote(q) {
 export async function importSeed(onProgress) {
   const r = await fetch('data/seed.json', { cache: 'no-store' });
   const seed = await r.json();
-  if (seed.settings && seed.settings.firma) await saveFirma({ ...DEFAULT_FIRMA, ...seed.settings.firma });
+  // nastavení firmy se nepřepisuje: doplní se jen to, co v uloženém nastavení chybí
+  if (seed.settings && seed.settings.firma) { const cur = S.firmaBase || {}; await saveFirma({ ...DEFAULT_FIRMA, ...seed.settings.firma, ...cur }); }
   for (const c of seed.contacts || []) {
     if (!S.contacts.some((x) => x.name.toLowerCase() === c.name.toLowerCase())) await saveContact(c);
   }
@@ -310,11 +327,7 @@ export async function importSeed(onProgress) {
 
 // ---------- faktury ----------
 export async function listInvoices(quoteId) {
-  let q = sb.from('invoices').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false });
-  if (quoteId) q = q.eq('quote_id', quoteId);
-  const { data, error } = await q;
-  if (error) throw error;
-  return data;
+  return pageAll(() => { let q = sb.from('invoices').select('*').order('issued_on', { ascending: false }).order('number', { ascending: false }).order('id'); if (quoteId) q = q.eq('quote_id', quoteId); return q; });
 }
 export async function getInvoice(id) {
   const { data, error } = await sb.from('invoices').select('*').eq('id', id).single();
@@ -361,18 +374,31 @@ export async function loadRecords(kind) {
     out.push(...data);
     if (data.length < 1000) break;
   }
+  out.forEach((r) => { r._base = JSON.stringify(r.data || {}); });
   S.rec[kind] = out;
   return out;
 }
 export async function addRecord(kind, data = {}, date = isoToday()) {
   const { data: r, error } = await sb.from('records').insert({ kind, rec_date: date, data }).select().single();
   if (error) throw error;
+  r._base = JSON.stringify(r.data || {});
   (S.rec[kind] = S.rec[kind] || []).push(r);
   return r;
 }
 export async function saveRecord(r) {
-  const { error } = await sb.from('records').update({ rec_date: r.rec_date || isoToday(), data: r.data }).eq('id', r.id);
+  // ukládají se jen pole, která jsem změnil; změny druhého uživatele v jiných polích téhož záznamu se zachovají
+  const mine = r.data || {};
+  let data = mine;
+  if (r._base) {
+    const base = JSON.parse(r._base);
+    const keys = [...new Set([...Object.keys(base), ...Object.keys(mine)])].filter((k) => JSON.stringify(base[k]) !== JSON.stringify(mine[k]));
+    const { data: cur } = await sb.from('records').select('data').eq('id', r.id).maybeSingle();
+    if (cur && cur.data) { data = { ...cur.data }; for (const k of keys) { if (k in mine) data[k] = mine[k]; else delete data[k]; } }
+  }
+  const { error } = await sb.from('records').update({ rec_date: r.rec_date || isoToday(), data }).eq('id', r.id);
   if (error) throw error;
+  for (const k of Object.keys(data)) mine[k] = data[k];
+  r._base = JSON.stringify(data);
 }
 export async function deleteRecord(r) {
   const { error } = await sb.from('records').delete().eq('id', r.id);

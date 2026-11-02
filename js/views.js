@@ -3,7 +3,7 @@ import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
 import { importButtons } from './cenikimport.js';
-import { saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
+import { patchPrice, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
   let q = '';
@@ -81,7 +81,7 @@ export function pricesView(root) {
     const rows = all.slice(0, limit);
     const save = async (p, k, v) => {
       p[k] = (k === 'price' || k === 'pack') ? parseNum(v) : v;
-      try { await savePrice(p); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); }
+      try { await patchPrice(p, k, v); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); }
     };
     const small = (p, k, label, cls) => h('div', { class: 'pf ' + (cls || '') }, h('label', { class: 'f' }, label),
       h('input', { type: 'text', inputmode: (k === 'price' || k === 'pack') ? 'decimal' : 'text', value: p[k] ?? '', onchange: (e) => save(p, k, e.target.value) }));
@@ -143,7 +143,7 @@ export function settingsView(root) {
     h('input', { type: 'text', inputmode: 'decimal', value: f.rates[w] ?? '', oninput: (e) => { f.rates[f.workers[i]] = parseNum(e.target.value); } }))));
   const saveSettings = async () => {
     for (const k of ['mapei_discount', 'kabe_markup']) { // 28 → 0,28 (zadáno v procentech)
-      let x = Number(f[k]) || 0; if (x > 1) x /= 100; f[k] = Math.min(Math.max(x, 0), 1);
+      let x = Number(f[k]) || 0; if (x >= 1) x /= 100; f[k] = Math.min(Math.max(x, 0), 1);
     }
     try { await saveFirmaMerged(orig, f); orig = JSON.parse(JSON.stringify(f)); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); }
   };

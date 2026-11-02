@@ -136,7 +136,7 @@ export function parsePrace(sheets) {
     const cat = SHEET_CAT(sh.name);
     for (const r of sh.rows.slice(hi + 1)) {
       const code = clean(r[cC]), name = clean(r[cN]); if (!name) continue;
-      const price = parseNum(r[cP]); if (!(price >= 0)) continue;
+      if (clean(r[cP]) === '') continue; const price = parseNum(r[cP]); if (!(price >= 0)) continue;
       const ed = cEd >= 0 ? clean(r[cEd]) : '';
       const group = clean(r[cG]);
       out.push({ category: cat, code, name, unit: clean(r[cU]), price, pack: 1, group: NO_PREFIX.has(norm(sh.name)) || !group ? group : `${sh.name} – ${group}`, note: cNote >= 0 ? clean(r[cNote]) : '',

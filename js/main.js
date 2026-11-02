@@ -20,6 +20,19 @@ const app = document.getElementById('app');
 if ('serviceWorker' in navigator) {
   const had = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then((r) => { setInterval(() => r.update().catch(() => {}), 5 * 60 * 1000); }).catch(() => {});
+  // záloha k service workeru: každých 5 min a při návratu do aplikace se porovná verze na serveru
+  const checkVersion = async () => {
+    try {
+      const t = await (await fetch('js/config.js', { cache: 'no-store' })).text();
+      const m = /APP_VERSION\s*=\s*'([^']+)'/.exec(t);
+      if (m && m[1] !== APP_VERSION) {
+        const go = () => location.reload();
+        if (window.__isDirty && window.__isDirty()) window.__flushSave().then(go, go); else go();
+      }
+    } catch (_) { /* offline */ }
+  };
+  setInterval(checkVersion, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!had) return;
     // nové verze se nenačítají uprostřed psaní: nejdřív se uloží rozpracované změny
@@ -81,7 +94,7 @@ async function route() {
   const drawer = h('aside', { class: 'drawer' },
     h('div', { class: 'drawer-head' }, h('div', { class: 'brand' }, 'JL-OBKLADY', h('small', null, 'KALKULAČKA · v' + APP_VERSION))),
     h('nav', null, TABS.map(([href, l]) => h('a', { href, class: isActive(href) ? 'active' : '', onclick: close }, l)),
-      h('a', { href: '#', onclick: (e) => { e.preventDefault(); close(); profilePicker(() => route()); } }, 'Profil: ' + ((S.firmaBase.profiles || {})[S.profile] || {}).label + ' (změnit)'),
+      h('a', { href: '#', onclick: (e) => { e.preventDefault(); close(); profilePicker(() => route()); } }, 'Profil: ' + (((S.firmaBase.profiles || {})[S.profile] || {}).label || 'nevybrán') + ' (změnit)'),
       h('a', { href: '#', class: 'out', onclick: async (e) => { e.preventDefault(); if (window.__flushSave) { try { await window.__flushSave(); } catch (_) { /* */ } window.__flushSave = null; window.__isDirty = null; } await sb.auth.signOut(); S.user = null; loginView(); } }, 'Odhlásit')));
   const bar = h('div', { class: 'topbar' },
     h('button', { class: 'burger', 'aria-label': 'Menu', onclick: () => { drawer.classList.add('open'); scrim.classList.add('open'); } }, h('span'), h('span'), h('span')),

@@ -127,7 +127,7 @@ export async function quoteEditor(root, id) {
       field('Poznámka k nabídce', h('textarea', { oninput: bind('note') }, q.note || ''), 'span2'),
       field('Stav platby', h('select', { onchange: bind('payment_status') }, PLATBA.map((s) => h('option', { selected: s === q.payment_status }, s)))))),
     h('div', { class: 'row end' },
-      h('button', { class: 'btn ghost', onclick: async () => { const n = await duplicateQuote(q); toast('Zkopírováno jako ' + n.number); location.hash = '#/nabidka/' + n.id; } }, 'Duplikovat'),
-      h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(`Smazat nabídku ${q.number}?`)) { saver.stop(); window.__flushSave = null; window.__isDirty = null; await deleteQuote(q.id); location.hash = '#/nabidky'; } } }, 'Smazat')),
+      h('button', { class: 'btn ghost', onclick: async () => { try { const n = await duplicateQuote(q); toast('Zkopírováno jako ' + n.number); location.hash = '#/nabidka/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, 'Duplikovat'),
+      h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(`Smazat nabídku ${q.number}?`)) { try { await deleteQuote(q.id); } catch (e) { return toast(e.message, 'err'); } saver.stop(); window.__flushSave = null; window.__isDirty = null; location.hash = '#/nabidky'; } } }, 'Smazat')),
     preview);
 }

@@ -80,7 +80,7 @@ export function openGuide({ item, row, onDone }) {
   const redraw = () => {
     const rows = buildRows({ ...P, A: num(P.A), perim: num(P.perim) });
     listBox.replaceChildren();
-    if (!num(P.A)) { listBox.append(h('p', { class: 'muted' }, 'Zadejte plochu (m²) – návrh se spočítá.')); totalEl.textContent = ''; return; }
+    if (!num(P.A)) { listBox.append(h('p', { class: 'muted' }, 'Zadejte plochu (m²) – návrh se spočítá.')); totalEl.textContent = ''; lastRows = []; return; }
     let lastG = '', sum = 0;
     for (const o of rows) {
       const l = o.l;

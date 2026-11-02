@@ -106,7 +106,7 @@ export async function invoiceEditor(root, id) {
       fld('Částka (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: inv.amount, oninput: bind('amount', true) })),
       fld('Stav', h('select', { onchange: (e) => { inv.paid = e.target.value === '1'; touch(); } }, h('option', { value: '0', selected: !inv.paid }, 'Nezaplaceno'), h('option', { value: '1', selected: inv.paid }, 'Zaplaceno'))),
       fld('Popis', h('textarea', { oninput: bind('description') }, inv.description || ''), 'span3'))),
-    h('div', { class: 'row end', style: { marginBottom: '12px' } }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('Smazat fakturu ' + inv.number + '?')) { isaver.stop(); window.__flushSave = null; window.__isDirty = null; await deleteInvoice(inv.id); location.hash = inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky'; } } }, 'Smazat')),
+    h('div', { class: 'row end', style: { marginBottom: '12px' } }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('Smazat fakturu ' + inv.number + '?')) { try { await deleteInvoice(inv.id); } catch (e) { return toast(e.message, 'err'); } isaver.stop(); window.__flushSave = null; window.__isDirty = null; location.hash = inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky'; } } }, 'Smazat')),
     preview);
   draw();
 }

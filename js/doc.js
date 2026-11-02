@@ -24,7 +24,7 @@ export function quoteDoc(q) {
   const rows = items.map((r, i) => `<tr>
     <td class="c">${i + 1}</td><td class="typ">${esc(typeLabel(r.typ))}</td><td>${esc(r.name)}</td>
     <td class="c">${esc(r.unit)}</td><td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td>
-    <td class="c">${parseNum(r.disc) ? Math.round(parseNum(r.disc) * 100) + ' %' : ''}</td>
+    <td class="c">${parseNum(r.disc) ? Math.round(parseNum(r.disc) * 1000) / 10 + ' %' : ''}</td>
     <td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
   const html = `<div class="doc">
     <div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">CENOVÁ NABÍDKA</div></div>
@@ -95,7 +95,7 @@ export function settlementDoc(q) {
   const items = (st.items || []).filter((r) => r.name);
   const t = settlementTotals(q);
   const rows = items.map((r, i) => `<tr><td class="c">${i + 1}</td><td class="typ">${esc(typeLabel(r.typ))}</td><td>${esc(r.name)}</td><td class="c">${esc(r.unit)}</td>
-    <td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td><td class="c">${parseNum(r.disc) ? Math.round(parseNum(r.disc) * 100) + ' %' : ''}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
+    <td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td><td class="c">${parseNum(r.disc) ? Math.round(parseNum(r.disc) * 1000) / 10 + ' %' : ''}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
   const sum = [];
   if (!t.bez) sum.push(['Celkem dle nabídky ' + esc(q.number), kc(t.offer)], ['Rozdíl oproti nabídce', kc(t.diff)]);
   if (t.advance) sum.push(['Uhrazená záloha', kc(-t.advance)]);

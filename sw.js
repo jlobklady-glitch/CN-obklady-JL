@@ -1,5 +1,5 @@
 // Service worker: síť má přednost (nová verze se načte hned po připojení), offline se bere z mezipaměti.
-const CACHE = 'jl-obklady-v3';
+const CACHE = 'jl-obklady-v4'; // 0.28.1 – při každé verzi zvýšit, aby se služba aktualizovala
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/main.js', 'vendor/supabase.js', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
