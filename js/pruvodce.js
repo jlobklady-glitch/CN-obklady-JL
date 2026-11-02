@@ -131,8 +131,6 @@ export function openGuide({ item, row, onDone }) {
         mode === 'podlaha' ? chk('nivGrind', 'Před nivelací brousit / frézovat a vysát podklad (dle potřeby)') : null,
         mode === 'podlaha' ? chk('nivCrack', 'Sešití trhlin ocelovými sponami + epoxid (Eporip)', () => { redraw(); }) : null,
         mode === 'podlaha' ? num_('nivCrackBm', 'Trhliny k sešití (bm, jen při zaškrtnutí)') : null,
-        mode === 'podlaha' ? chk('nivCover', 'Spáry v celé ploše – přelepit před nivelací', () => { redraw(); }) : null,
-        mode === 'podlaha' ? num_('nivCoverBm', 'Spáry k přelepení (bm, prázdné = odhad)') : null,
         mode === 'podlaha' ? sel('sep', 'Separační vrstva (ne v koupelně s folií)', [['none', 'bez separace'], ['mapetex', 'Mapetex (textilie proti trhlinám)'], ['wp200', 'Mapeguard WP 200 (folie)']]) : null,
         sel('adhesive', 'Lepidlo', [['auto', 'automaticky podle formátu'], ['maxi', 'Keraflex Maxi S1'], ['extra', 'Keraflex Extra S1'], ['ul1', 'Ultralite S1 Flex'], ['ul2', 'Ultralite S2 Flex']]),
         sel('silType', 'Silikon', [['ac', 'Mapesil AC (kyselý)'], ['lm', 'Mapesil LM (neutrální)']]),

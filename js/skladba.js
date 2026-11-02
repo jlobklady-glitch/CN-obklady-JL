@@ -15,7 +15,6 @@ export const MAT = {
   ultraplanMaxi: { re: /^ULTRAPLAN\s+MAXI$/i, label: 'MAPEI Ultraplan Maxi (samonivelační stěrka 3–30 mm)' },
   eporip:    { re: /^EPORIP\s+\(02\)\s+\/A\+B$/i, label: 'MAPEI Eporip (2K epoxid na sešití trhlin), souprava 2 kg' },
   sponaVln:  { re: /^Spona\s+vlnková\s+120\/6/i, label: 'Ocelová spona vlnková 120/6 (sešití trhlin)' },
-  bandSA:    { re: /^MAPEBAND\s+SA\s*$/i, label: 'MAPEI Mapeband SA (samolepicí těsnicí páska)' },
   keraflex:  { re: /KERAFLEX\s+MAXI\s+S1\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Keraflex Maxi S1 (lepidlo, třída S1)' },
   keraflexX: { re: /KERAFLEX\s+EXTRA\s+S1\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Keraflex Extra S1 (lepidlo, třída S1)' },
   ultralite1:{ re: /ULTRALITE\s+S1\s+FLEX\s+ZERO\s+ŠEDÝ/i, label: 'MAPEI Ultralite S1 Flex (lehké lepidlo, třída S1)' },
@@ -60,7 +59,7 @@ export function defaults(p, mode) {
   const big = Math.max(...f) >= 60;
   return {
     mode, A: 10, fa: f[0], fb: f[1], thick: Math.max(...f) >= 120 ? 6 : 9, joint: big ? 2 : 3, perim: 0,
-    uneven: false, nivT: 3, nivCover: false, nivCoverBm: '', nivCrack: false, nivCrackBm: '', nivGrind: false, penLayers: 1, penType: 'beton',
+    uneven: false, nivT: 3, nivCrack: false, nivCrackBm: '', nivGrind: false, penLayers: 1, penType: 'beton',
     sep: mode === 'podlaha' && big ? 'mapetex' : 'none', adhesive: 'auto', silType: 'ac', spony: big, butter: mode === 'podlaha' && big, bedT: 4, hydro: 'wp200', hyReinf: 'net', wpAdh: '1k', prostText: '2×32', cornerBm: 0,
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
@@ -106,14 +105,9 @@ export function plan(P) {
       add({ id: 'm_ncr', group: 'Nivelace', kind: 'mat', mat: 'eporip', need: cb * 0.15, needUnit: 'kg', name: MAT.eporip.label, ok: false, note: `TL Eporip: 1,35 kg na 1 litr vyplňované dutiny; ⚠ odhad 0,15 kg na 1 bm trhliny vč. drážek pro spony (rozsah 0,5–2 kg/m² při lepení); trhlinu nechat před nivelací vytvrdnout (TL: úplné vytvrzení 7 dní)` });
       add({ id: 'm_nsp', group: 'Nivelace', kind: 'mat', mat: 'sponaVln', need: Math.ceil(cb * 3.4), needUnit: 'ks', name: MAT.sponaVln.label, ok: false, note: '⚠ odhad: 1 spona po cca 30 cm trhliny (3–4 ks na bm)' });
     }
-    if (P.nivCover) {
-      const bm = Number(P.nivCoverBm) || Math.round(A * 1.7 * 10) / 10;
-      const est = Number(P.nivCoverBm) ? '' : ' ⚠ odhad: spáry v celé ploše po cca 60 cm (1,7 bm/m²) – zadejte skutečnou délku';
-      add({ id: 'ncv', group: 'Nivelace', kind: 'work', code: 'NIV-003', name: 'Přelepení a utěsnění spár v podkladu před litím stěrky', unit: 'bm', qty: bm, ok: true, note: 'spáry v celé ploše – zabrání zatečení stěrky do spár' + est });
-      add({ id: 'm_ncv', group: 'Nivelace', kind: 'mat', mat: 'bandSA', need: bm * 1.1, needUnit: 'bm', name: MAT.bandSA.label, ok: false, note: `⚠ materiál zvolen z nabídky MAPEI (samolepicí páska na spáry) – zkontrolujte; ${r2(bm)} bm + 10 % přesah` });
-    }
     add({ id: 'pen1', group: 'Nivelace', kind: 'work', code: 'NIV-001', name: 'Penetrace podkladu před litím nivelační stěrky', unit: 'm²', qty: An * pen, ok: true, note: sh ? sh.trim() : undefined });
     add({ id: 'dil', group: 'Nivelace', kind: 'work', code: 'NIV-002', name: 'Obvodový dilatační pásek se zástěrkou', unit: 'bm', qty: perim, ok: true });
+    add({ id: 'o_dil', group: 'Nivelace', kind: 'other', need: perim, needUnit: 'bm', name: 'Okrajový dilatační pásek – obyčejný betonářský (materiál)', unit: 'bm', qty: perim, ok: false, note: 'není v ceníku MAPEI – doplňte cenu' });
     const t = Number(P.nivT) || 3;
     const thickLayer = t > 10;
     add({ id: 'niv', group: 'Nivelace', kind: 'work', code: thickLayer ? 'NIV-005' : 'NIV-004', name: thickLayer ? `Silnovrstvá samonivelační stěrka tl. ${t} mm` : `Samonivelační stěrka tl. ${t} mm`, unit: 'm²', qty: An, ok: true, note: sh ? sh.trim() : undefined });
