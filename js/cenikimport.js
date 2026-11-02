@@ -1,6 +1,6 @@
 // Import a export ceníků MAPEI a KABE ze souboru (.xlsx / .csv). Nic se nemaže – jen přepisují ceny, přidávají nové položky.
 import { h, toast, parseNum } from './util.js';
-import { S, sb } from './store.js';
+import { S, sb, reloadPrices } from './store.js';
 
 let xlsxP;
 function loadXlsx() {
@@ -92,8 +92,7 @@ async function apply(cat, pl) {
   for (let i = 0; i < ins.length; i += 200) {
     const { error } = await sb.from('price_items').insert(ins.slice(i, i + 200)); if (error) throw error;
   }
-  const { data, error } = await sb.from('price_items').select('*').order('name'); if (error) throw error;
-  S.prices = data;
+  await reloadPrices();
 }
 
 function showPlan(cat, pl, done) {
@@ -207,8 +206,7 @@ async function applyPrace(pl) {
   const ins = pl.add.map((n) => rowOf(n, null));
   for (let i = 0; i < ins.length; i += 200) { const { error } = await sb.from('price_items').insert(ins.slice(i, i + 200)); if (error) throw error; }
   if (pl.del.length) { const { error } = await sb.from('price_items').delete().in('id', pl.del.map((p) => p.id)); if (error) throw error; }
-  const { data, error } = await sb.from('price_items').select('*').order('name'); if (error) throw error;
-  S.prices = data;
+  await reloadPrices();
 }
 export function praceExportRows() {
   const out = {};

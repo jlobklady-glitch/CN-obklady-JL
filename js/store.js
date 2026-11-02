@@ -65,6 +65,8 @@ export function setProfile(k) {
 
 const CACHE_KEY = 'jl-cache-v1';
 
+export async function reloadPrices() { S.prices = await fetchAll('price_items', 'name'); return S.prices; }
+
 async function fetchAll(table, order) {
   const out = [];
   const step = 1000;
