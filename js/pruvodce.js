@@ -102,6 +102,7 @@ export function openGuide({ item, row, onDone }) {
   let lastRows = [];
   const num_ = (key, label, extra = {}) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label),
     h('input', { type: 'text', inputmode: 'decimal', class: 'num', 'data-k': key, value: P[key] ?? '', placeholder: extra.ph || '', oninput: (e) => { P[key] = e.target.value === '' ? '' : num(e.target.value); redraw(); } }));
+  const txt_ = (key, label) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label), h('input', { type: 'text', value: P[key] ?? '', oninput: (e) => { P[key] = e.target.value; redraw(); } }));
   const chk = (key, label, after) => h('label', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, h('input', { type: 'checkbox', style: { width: 'auto' }, checked: !!P[key], onchange: (e) => { P[key] = e.target.checked; if (after) after(); redraw(); } }), label);
   const sel = (key, label, opts, after) => h('label', { style: { display: 'block' } }, h('span', { class: 'muted', style: { fontSize: '12px' } }, label),
     h('select', { onchange: (e) => { P[key] = e.target.value; if (after) after(); redraw(); } }, opts.map(([v, t]) => h('option', { value: v, selected: P[key] === v }, t))));
@@ -113,7 +114,7 @@ export function openGuide({ item, row, onDone }) {
     if (!P.wet) return;
     wetBox.append(num_('wetWalls', 'Hydroizolace na stěnách (m²)', { ph: 'např. sprchový kout 6' }), num_('slopeA', 'Spádování – plocha sprchy (m²)'), num_('slopeT', 'Spádový potěr – průměrná tl. (cm)'),
       sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'sprchový žlab'], ['vpust', 'bodová vpusť']]), num_('drainLen', 'Délka žlabu (bm)'),
-      sel('hydro', 'Hydroizolace podlahy', [['smart', 'cementová Mapelastic Smart'], ['wp200', 'folie Mapeguard WP 200']]), sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]), num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), num_('prost', 'Prostupů potrubí (ks)'), chk('test', 'Zkouška těsnosti (zatopení)'));
+      sel('hydro', 'Hydroizolace', [['wp200', 'folie Mapeguard WP 200 (podlaha i stěny)'], ['smart', 'cementová Mapelastic Smart (podlaha) + Mapegum WPS (stěny)']]), sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]), sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]), num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), txt_('prostText', 'Prostupy: ks × průměr mm (např. 2×32, 1×110)'), num_('cornerBm', 'Svislé kouty ve sprše (bm)'), chk('test', 'Zkouška těsnosti (zatopení)'));
   };
   drawWet();
   const dlg = h('div', { class: 'modal-back', style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' } },
