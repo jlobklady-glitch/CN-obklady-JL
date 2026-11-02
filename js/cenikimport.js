@@ -239,6 +239,9 @@ function showPracePlan(pl, done) {
   document.body.appendChild(dlg);
 }
 
+// Zabudovaný ceník je potřeba načíst, dokud v databázi chybí nové položky nebo zůstávají staré duplicity.
+export const OBSOLETE_CODES = ['LOG-007', 'HYDR-016', 'HYDR-017', 'HYDR-018', 'HYDR-019', 'HYDR-020', 'HYDR-021', 'HYDR-025'];
+export const bundledPending = () => !S.prices.some((p) => p.code === 'PRI-001') || !S.prices.some((p) => p.code === 'SPD-001') || S.prices.some((p) => OBSOLETE_CODES.includes(p.code));
 export async function openBundledPrace(done) {
   try {
     toast('Načítám ceník z aplikace…');
@@ -259,7 +262,7 @@ export function importButtons(cat, done) {
       } catch (er) { toast(er.message || String(er), 'err'); }
     } });
     const bundled = h('button', { class: 'btn gold small', onclick: () => openBundledPrace(done) }, 'Načíst ceník prací 2026 (z aplikace)');
-    const already = S.prices.some((p) => p.code === 'PRI-001') && S.prices.some((p) => p.code === 'SPD-001');
+    const already = !bundledPending();
     return h('span', { style: { display: 'inline-flex', gap: '6px', flexWrap: 'wrap' } },
       already ? null : bundled,
       h('button', { class: 'btn ghost small', onclick: () => file.click() }, 'Import ze souboru'),
