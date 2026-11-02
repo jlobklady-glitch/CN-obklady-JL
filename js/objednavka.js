@@ -9,6 +9,7 @@ export async function orderView(root, id) {
   try { q = await getQuote(id); } catch (e) { root.replaceChildren(h('div', { class: 'card' }, 'Nabídka nenalezena.')); return; }
   const rows = (q.items || []).filter((r) => r.typ === 'mapei' && r.name).map((r) => {
     const p = S.prices.find((x) => x.id === r.item_id);
+    if (r.roll && p) { const pk = Number(p.pack) || 1; return { code: p.code, name: p.name, qty: Math.ceil((Number(r.qty) || 0) / pk - 1e-9), unit: 'bal.', note: `role ${pk} ${p.unit}; v nabídce spotřeba ${r.qty} ${r.unit}` }; }
     return { code: p ? p.code : '', name: p ? p.name : r.name, qty: r.qty, unit: r.unit || 'bal.', note: p ? `balení ${Number(p.pack) || 1} ${p.unit}` : '' };
   });
   const o = { quote: q, supplier: '', note: '', rows };

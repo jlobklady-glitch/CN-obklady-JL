@@ -38,11 +38,16 @@ export function buildRows(P) {
     const o = { l, row: null, miss: null, price: 0 };
     if (l.kind === 'work') {
       const it = workItem(l.code);
-      if (it) { const pr = priceFor(it, l.qty); o.row = { typ: 'prace', item_id: it.id, name: it.name, unit: it.unit, qty: l.qty, price: pr, disc: 0 }; }
+      if (it) { const pr = priceFor(it, l.qty); o.row = { typ: 'prace', item_id: it.id, name: l.label || it.name, unit: it.unit, qty: l.qty, price: pr, disc: 0 }; }
       else { o.miss = `Položka ${l.code} chybí v ceníku prací – načtěte ceník 2026`; o.row = { typ: 'prace', name: l.name, unit: l.unit, qty: l.qty, price: '', disc: 0 }; }
     } else if (l.kind === 'mat') {
       const r = resolveMat(l, P);
-      if (r) { o.row = { typ: 'mapei', item_id: r.p.id, name: displayName(r.p), unit: displayUnit(r.p), qty: r.n, price: priceFor(r.p, r.n), disc: 0 }; o.packs = `${r.n} × ${r.pack} ${r.p.unit || ''}`; o.cost = r.cost; }
+      if (r && MAT[l.mat] && MAT[l.mat].roll) {
+        // role: zákazníkovi jen spotřebované metry (vč. rezervy), do objednávky a na sklad celé role
+        const u = r.p.unit || 'bm', perU = Math.round(priceFor(r.p, 1) / r.pack * 100) / 100;
+        o.row = { typ: 'mapei', item_id: r.p.id, name: `${String(r.p.name).trim()} | dle spotřeby`, unit: u, qty: Math.ceil(l.need * 10) / 10, price: perU, disc: 0, roll: r.pack };
+        o.packs = `do objednávky ${r.n} × role ${r.pack} ${u} (zákazníkovi jen spotřeba)`; o.cost = r.cost;
+      } else if (r) { o.row = { typ: 'mapei', item_id: r.p.id, name: displayName(r.p), unit: displayUnit(r.p), qty: r.n, price: priceFor(r.p, r.n), disc: 0 }; o.packs = `${r.n} × ${r.pack} ${r.p.unit || ''}`; o.cost = r.cost; }
       else { o.miss = `${l.name}: v ceníku MAPEI jsem nenašel vhodné balení – doplňte ručně`; o.row = { typ: 'mapei', name: l.name, unit: l.needUnit, qty: Math.ceil(l.need), price: '', disc: 0 }; }
     } else if (l.kind === 'other') {
       o.row = { typ: 'ostatni', name: l.name, unit: l.unit, qty: l.qty, price: '', disc: 0 };
@@ -141,6 +146,11 @@ export function openGuide({ item, row, onDone }) {
         sel('adhesive', 'Lepidlo', [['auto', 'automaticky podle formátu'], ['maxi', 'Keraflex Maxi S1'], ['extra', 'Keraflex Extra S1'], ['ul1', 'Ultralite S1 Flex'], ['ul2', 'Ultralite S2 Flex']]),
         sel('silType', 'Silikon', [['ac', 'Mapesil AC (kyselý)'], ['lm', 'Mapesil LM (neutrální)']]),
         chk('spony', 'Nivelační spony + klínky + křížky'),
+        mode === 'podlaha' ? chk('sokl', 'Sokl z dlažby (silikon, fabionek, rohy)') : null,
+        mode === 'podlaha' ? num_('soklH', 'Výška soklu (cm)') : null,
+        mode === 'podlaha' ? num_('soklBm', 'Obvod soklu (bm, prázdné = obvod místnosti)') : null,
+        mode === 'podlaha' ? num_('soklIn', 'Vnitřní rohy soklu (ks)') : null,
+        mode === 'podlaha' ? num_('soklOut', 'Vnější rohy soklu (ks)') : null,
         mode === 'podlaha' ? chk('butter', 'Oboustranné lepení (buttering-floating)') : null,
         mode === 'podlaha' ? chk('dilatPasek', 'Okrajový dilatační pásek') : null,
         num_('dilBm', 'Dilatační spáry v ploše (bm)'),
