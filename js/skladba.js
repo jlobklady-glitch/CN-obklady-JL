@@ -125,7 +125,7 @@ export function plan(P) {
     const la = Number(P.levA) || A, lt = Number(P.levT) || 3;
     if (P.levType === 'malta') {
       add({ id: 'lev', group: 'Vyrovnání stěny', kind: 'work', code: lt <= 10 ? 'ZEDN-005' : 'ZEDN-006', name: lt <= 10 ? 'Vyrovnání stěn jádrovou omítkou / stěrkou do 10 mm' : 'Vyrovnání stěn lokální do 20 mm', unit: 'm²', qty: la, ok: lt <= 20, note: lt > 20 ? 'nad 20 mm už v ceníku není položka – upravte ručně' : undefined });
-      add({ id: 'o_lev', group: 'Vyrovnání stěny', kind: 'other', need: Math.ceil(la * lt * 1.6), needUnit: 'kg', name: 'Vyrovnávací malta PCI K01 (materiál)', unit: 'kg', qty: Math.ceil(la * lt * 1.6), ok: false, note: `není v ceníku MAPEI – doplňte cenu a spotřebu; ⚠ odhad 1,6 kg/m² na 1 mm × ${r2(la)} m² × ${lt} mm` });
+      add({ id: 'o_lev', group: 'Vyrovnání stěny', kind: 'other', need: Math.ceil(la * lt * 1.6), needUnit: 'kg', name: 'Vyrovnávací malta PCI K01 (materiál)', unit: 'kg', qty: Math.ceil(la * lt * 1.6), ok: false, note: `není v ceníku – doplňte cenu; množství jen orientační (⚠ 1,6 kg/m² na 1 mm × ${r2(la)} m² × ${lt} mm)` });
     } else {
       add({ id: 'lev', group: 'Vyrovnání stěny', kind: 'work', code: 'ZDN-043', name: 'Dorovnání podkladu stěrkovým lepidlem (do 5 mm)', unit: 'm²', qty: la, ok: lt <= 5, note: lt > 5 ? 'stěrkovým lepidlem jen do 5 mm – při větší tloušťce zvolte maltu' : undefined });
       add({ id: 'm_lev', group: 'Vyrovnání stěny', kind: 'mat', mat: 'keraflex', need: la * lt * 1.2 * (1 + rs / 100), needUnit: 'kg', name: MAT.keraflex.label + ' – stěrkově na vyrovnání', ok: true, note: `TL: 1,2 kg/m² na 1 mm; ${r2(la)} m² × ${lt} mm + rezerva ${rs} %` });
@@ -148,7 +148,11 @@ export function plan(P) {
     const mxf = Math.max(Number(P.fa) || 0, Number(P.fb) || 0);
     const jol = mxf <= 60 ? ['JOL-002', 'gres do 60×60'] : mxf <= 160 ? ['JOL-003', 'velký formát 60×120 až 80×160'] : ['JOL-004', 'XXL desky'];
     add({ id: 'nika', group: 'Nika', kind: 'work', code: 'MONT-008', name: `Obložení niky ${nW}×${nH}×${nD} cm`, unit: 'ks', qty: nN, ok: true, note: `plocha obkladu v nice ≈ ${r2(nicheA)} m² (zadní stěna + 4 boky)${P.wet ? '; započítáno do hydroizolace' : ''}` });
-    if (P.nicheLed) add({ id: 'nled', group: 'Nika', kind: 'work', code: 'ELV-004', name: 'Obvodové podsvícení niky LED páskem vč. difuzoru', unit: 'bm', qty: r2(nichePer), ok: true, note: 'zapuštěné osvětlení – obvod niky; ⚠ ověřte, zda ho děláte vy nebo elektrikář' });
+    if (P.nicheLed) {
+      add({ id: 'nled', group: 'Nika', kind: 'work', code: 'KAM-009', name: 'Montáž LED lišty v nice (obvod niky)', unit: 'bm', qty: r2(nichePer), ok: true, note: 'zapuštěné osvětlení; instalaci LED pásku a zapojení provede elektrikář' });
+      add({ id: 'nled2', group: 'Nika', kind: 'work', code: 'KAM-022', name: 'Řezání obkladu na míru pro LED lištu v nice', unit: 'bm', qty: r2(nichePer), ok: true, note: 'řezání navíc kolem lišty' });
+      add({ id: 'o_nled', group: 'Nika', kind: 'other', need: r2(nichePer * 1.05), needUnit: 'bm', name: 'LED lišta do niky (materiál)', unit: 'bm', qty: r2(nichePer * 1.05), ok: false, note: 'není v ceníku – doplňte cenu (+ 5 % odřezky)' });
+    }
     if (P.nicheEdge === 'jolly') add({ id: 'nedge', group: 'Nika', kind: 'work', code: jol[0], name: `Kamenický roh 45° (Jolly) po obvodu niky – ${jol[1]}`, unit: 'bm', qty: r2(nichePer), ok: true, note: 'pro keramiku / přírodní kámen zvolte JOL-001 / JOL-005 ručně' });
     else if (P.nicheEdge === 'lista') {
       add({ id: 'nedge', group: 'Nika', kind: 'work', code: 'KAM-008', name: 'Montáž ukončovací lišty po obvodu niky', unit: 'bm', qty: r2(nichePer), ok: true });
