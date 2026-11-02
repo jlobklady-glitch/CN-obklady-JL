@@ -112,8 +112,8 @@ export function openGuide({ item, row, onDone }) {
   const drawWet = () => {
     wetBox.replaceChildren();
     if (!P.wet) return;
-    wetBox.append(num_('wetWalls', 'Hydroizolace na stěnách (m²)', { ph: 'např. sprchový kout 6' }), num_('slopeA', 'Spádování – plocha sprchy (m²)'), num_('slopeT', 'Spádový potěr – průměrná tl. (cm)'),
-      sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'sprchový žlab'], ['vpust', 'bodová vpusť']]), num_('drainLen', 'Délka žlabu (bm)'),
+    wetBox.append(num_('showerL', 'Sprcha – rozměr A (cm, min. 80)'), num_('showerW', 'Sprcha – rozměr B (cm, prázdné = stejný)'), num_('wallBm', 'Délka stěn s hydroizolací (bm, prázdné = L+W)'), num_('wetH', 'Výška hydroizolace stěn (m, min. 2)'), chk('slope', 'Spádování sprchy (potěr + dlažba do spádu)'), num_('slopeT', 'Spádový potěr – průměrná tl. (cm)'),
+      sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'sprchový žlab'], ['vpust', 'bodová vpusť']]), sel('drainType', 'Typ žlabu', [['zed', 'u zdi'], ['roh', 'v rohu'], ['prostor', 'volně v prostoru'], ['vzed', 'integrovaný ve zdi']]), num_('drainLen', 'Délka žlabu (bm)'),
       sel('hydro', 'Hydroizolace', [['wp200', 'folie Mapeguard WP 200 (podlaha i stěny)'], ['smart', 'cementová Mapelastic Smart (podlaha) + Mapegum WPS (stěny)']]), sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]), sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]), num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), txt_('prostText', 'Prostupy: ks × průměr mm (např. 2×32, 1×110)'), num_('cornerBm', 'Svislé kouty ve sprše (bm)'), chk('test', 'Zkouška těsnosti (zatopení)'));
   };
   drawWet();

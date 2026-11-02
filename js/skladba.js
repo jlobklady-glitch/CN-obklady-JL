@@ -36,6 +36,7 @@ export const MAT = {
   manzeta4:  { re: /MAPEBAND\s+EASY\s+manžeta\s+400/i, label: 'MAPEI Mapeband Easy manžeta 400×400' },
   manzeta:   { re: /MAPEBAND\s+EASY\s+manžeta\s+200/i, label: 'MAPEI Mapeband Easy manžeta 200×200' },
   mapecem:   { re: /^MAPECEM\s+PRONTO$/i, label: 'MAPEI Mapecem Pronto (rychlý spádový potěr)' },
+  topcem:    { re: /^TOPCEM\s+PRONTO$/i, label: 'MAPEI Topcem Pronto (spádový potěr)' },
 };
 // spony PROWDG C podle šířky spáry (v ceníku: 0,5 / 1,0 / 1,5 / 2,0 / 3,0 / 4,0 / 5,0 mm)
 export const sponaRe = (joint) => new RegExp('MAPELEVEL\\s+PROWDG\\s+SPONY\\s+C\\s+' + String(joint).replace('.', '[,.]').replace(/^(\d)$/, '$1[,.]0') + '\\s*mm', 'i');
@@ -58,7 +59,7 @@ export function defaults(p, mode) {
     uneven: false, nivT: 3, penLayers: 1, penType: 'beton',
     sep: mode === 'podlaha' && big ? 'mapetex' : 'none', adhesive: 'auto', silType: 'ac', spony: big, butter: mode === 'podlaha' && big, bedT: 4, hydro: 'wp200', hyReinf: 'net', wpAdh: '1k', prostText: '2×32', cornerBm: 0,
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
-    wet: false, wetWalls: 0, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
+    drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
   };
 }
@@ -99,22 +100,24 @@ export function plan(P) {
 
   // 2) hydroizolace + spád (mokrý provoz)
   if (P.wet) {
-    const w = Number(P.wetWalls) || 0; const hm2 = (floor ? A : 0) + w; const wpHydro = P.hydro === 'wp200'; const wpA = wpHydro ? (floor ? A : 0) + w : 0;
-    const sl = Number(P.slopeA) || 0;
+    const wallBm = Number(P.wallBm) || ((Number(P.showerL) || 0) + (Number(P.showerW) || Number(P.showerL) || 0)) / 100;
+    const wetH = Math.max(Number(P.wetH) || 2, 2); // minimum 2 m (přepočet až ve finálním vyúčtování)
+    const w = wallBm * wetH; const hm2 = (floor ? A : 0) + w; const wpHydro = P.hydro === 'wp200'; const wpA = wpHydro ? (floor ? A : 0) + w : 0;
+    const L = Number(P.showerL) || 0, W = Number(P.showerW) || L;
+    const sl = P.slope && L > 0 ? Math.max((L * W) / 10000, 0.64) : 0; // min. sprcha 80×80 cm
     if (sl > 0) {
       const t = Number(P.slopeT) || 4;
-      add({ id: 'slope', group: 'Spádování (sprchový kout)', kind: 'work', code: 'ZEDN-014', name: 'Cementový spádový potěr do žlabu / vpusti', unit: 'm²', qty: sl, ok: true });
-      add({ id: 'm_slope', group: 'Spádování (sprchový kout)', kind: 'mat', mat: 'mapecem', need: sl * t * 20 * (1 + rs / 100), needUnit: 'kg', name: MAT.mapecem.label, ok: true, note: `TL: cca 20 kg/m² na 1 cm; ${sl} m² × prům. ${t} cm` });
+      add({ id: 'slope', group: 'Spádování sprchového koutu', kind: 'work', code: 'SPD-001', name: 'Spádování sprchy – spádový potěr Topcem Pronto', unit: 'm²', qty: r2(sl), ok: true, note: `sprcha ${L}×${W} cm = ${r2(sl)} m² (minimum 80×80 cm)` });
+      add({ id: 'm_slope', group: 'Spádování sprchového koutu', kind: 'mat', mat: 'topcem', need: sl * t * 20 * (1 + rs / 100), needUnit: 'kg', name: MAT.topcem.label, ok: true, note: `TL: 18–20 kg/m² na 1 cm (použito 20); ${r2(sl)} m² × prům. ${t} cm; před pokládkou počkat 24 h, zbytková vlhkost < 2 % po 4 dnech` });
+      add({ id: 'slopeT', group: 'Spádování sprchového koutu', kind: 'work', code: 'SPD-002', name: 'Spádování dlažby ve sprše', unit: 'm²', qty: r2(sl), ok: true, note: 'nařezání dlažby do spádu a klínů kolem žlabu' });
     }
     if (P.drain === 'zlab') {
-      add({ id: 'zlab', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-024', name: 'Montáž sprchového nerezového žlabu vč. usazení a napojení', unit: 'ks', qty: 1, ok: true });
+      add({ id: 'zlab', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-024', name: 'Montáž sprchového nerezového žlabu vč. usazení a napojení', unit: 'ks', qty: 1, ok: true, note: 'typ žlabu zatím nemění cenu práce – dejte vědět, jaké jsou přirážky (volně v prostoru / roh / u zdi / ve zdi)' });
       add({ id: 'zlab2', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-010', name: 'Napojení a utěsnění příruby žlabu', unit: 'bm', qty: Number(P.drainLen) || 0.8, ok: true });
-      add({ id: 'o_zlab', group: 'Sprchový žlab / vpusť', kind: 'other', name: 'Sprchový žlab PP Drain Aqua (s předinstalovanou textilií Mapeguard WP 200)', unit: 'ks', qty: 1, need: 1, needUnit: 'ks', ok: false, note: 'není v ceníku – doplňte cenu; textilie na přírubě je již z výroby, hydroizolační folie se na ni navazuje přesahem (lepidlo WP Adhesive)' });
-      add({ id: 'spadp', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'MONT-013', name: 'Příplatek za pokládku do spádu', unit: 'm²', qty: sl || A, ok: true });
+      add({ id: 'o_zlab', group: 'Sprchový žlab / vpusť', kind: 'other', name: `Sprchový žlab PP Drain Aqua – ${({ prostor: 'volně v prostoru', roh: 'v rohu', zed: 'u zdi', vzed: 'integrovaný ve zdi' })[P.drainType] || 'u zdi'} (s předinstalovanou textilií Mapeguard WP 200)`, unit: 'ks', qty: 1, need: 1, needUnit: 'ks', ok: false, note: 'není v ceníku – doplňte cenu; textilie na přírubě je již z výroby, hydroizolační folie se na ni navazuje přesahem (lepidlo WP Adhesive)' });
     } else if (P.drain === 'vpust') {
       add({ id: 'vp', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'KOMP-006', name: 'Montáž sprchového odtoku / bodové vpusti', unit: 'ks', qty: 1, ok: true });
       add({ id: 'vp2', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-026', name: 'Napojení hydroizolace na vpusť (manžeta)', unit: 'ks', qty: 1, ok: true });
-      add({ id: 'spadp', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'MONT-013', name: 'Příplatek za pokládku do spádu', unit: 'm²', qty: sl || A, ok: true });
     }
     add({ id: 'hpen', group: 'Hydroizolace', kind: 'work', code: 'HYDR-001', name: 'Penetrace pod hydroizolaci', unit: 'm²', qty: hm2, ok: true });
     add({ id: 'm_hpen', group: 'Hydroizolace', kind: 'mat', mat: 'primerG', need: hm2 * penRate * (1 + rs / 100), needUnit: 'kg', name: MAT.primerG.label, ok: true, note: `stejně jako před lepením (${penRate} kg/m² koncentrátu), 1 vrstva pod hydroizolaci` });

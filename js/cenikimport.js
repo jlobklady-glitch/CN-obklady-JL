@@ -259,7 +259,7 @@ export function importButtons(cat, done) {
       } catch (er) { toast(er.message || String(er), 'err'); }
     } });
     const bundled = h('button', { class: 'btn gold small', onclick: () => openBundledPrace(done) }, 'Načíst ceník prací 2026 (z aplikace)');
-    const already = S.prices.some((p) => p.code === 'PRI-001');
+    const already = S.prices.some((p) => p.code === 'PRI-001') && S.prices.some((p) => p.code === 'SPD-001');
     return h('span', { style: { display: 'inline-flex', gap: '6px', flexWrap: 'wrap' } },
       already ? null : bundled,
       h('button', { class: 'btn ghost small', onclick: () => file.click() }, 'Import ze souboru'),

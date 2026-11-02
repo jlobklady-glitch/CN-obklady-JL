@@ -148,9 +148,9 @@ async function dueBanner(main) {
 // Nabídka jedním klepnutím načíst nový ceník prací 2026 (dokud v databázi chybí).
 function priceBanner(main) {
   try {
-    if (S.prices.some((p) => p.code === 'PRI-001') || sessionStorage.getItem('noPriceBanner')) return;
+    if ((S.prices.some((p) => p.code === 'PRI-001') && S.prices.some((p) => p.code === 'SPD-001')) || sessionStorage.getItem('noPriceBanner')) return;
     const el = h('div', { class: 'banner' },
-      h('span', null, 'Je připraven nový ceník prací 2026 (550 položek s poznámkami). '),
+      h('span', null, S.prices.some((p) => p.code === 'PRI-001') ? 'Je připravena aktualizace ceníku prací (spádování sprchy, úprava broušení). ' : 'Je připraven nový ceník prací 2026 (550 položek s poznámkami). '),
       h('button', { class: 'btn small gold', onclick: () => openBundledPrace(() => { el.remove(); route(); }) }, 'Načíst'),
       h('button', { class: 'btn small ghost', onclick: () => { try { sessionStorage.setItem('noPriceBanner', '1'); } catch (_) {} el.remove(); } }, '×'));
     main.parentNode.insertBefore(el, main);
