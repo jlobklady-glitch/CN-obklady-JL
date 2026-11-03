@@ -61,7 +61,7 @@ export function matcher(query) {
   const tokens = fix(query).split(/\s+/).filter(Boolean).map((k) => (k.length > 4 && /[aeiouy]$/.test(k) ? k.slice(0, -1) : k));
   return (text) => {
     const t = fix(text);
-    return tokens.every((k) => t.includes(k));
+    return tokens.every((k) => (/^\d+$/.test(k) ? new RegExp('(?<![\\d,.])' + k + '(?![\\d])').test(t) : t.includes(k)));
   };
 }
 

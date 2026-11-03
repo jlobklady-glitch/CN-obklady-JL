@@ -9,7 +9,7 @@ export function suggestBox(input, onPick, filter = () => true) {
   const show = () => {
     const m = matcher(input.value);
     if (input.value.trim().length < 2) return close();
-    list = S.prices.filter((p) => p.active && filter(p) && m(`${p.code} ${p.name}`)).slice(0, 40);
+    list = S.prices.filter((p) => p.active && filter(p) && m(`${p.code} ${p.name}`)).slice(0, 150);
     close();
     if (!list.length) return;
     box = h('div', { class: 'suggest' }, list.map((p, i) => h('div', { onmousedown: (e) => { e.preventDefault(); pick(i); } },
