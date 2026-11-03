@@ -166,3 +166,30 @@ export function orderDoc(o) {
     <table class="dt"><thead><tr><th>#</th><th class="l">KÓD</th><th class="l">NÁZEV PRODUKTU</th><th>MNOŽSTVÍ</th><th>JEDNOTKA</th><th class="l">POZNÁMKA</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="keep"><div class="lab" style="margin-top:3mm">Poznámka k objednávce</div><div class="notebox">${esc(o.note)}</div>${footer()}</div></div>`;
 }
+
+// Předávací protokol (data jsou v q.settlement.handover)
+export function handoverDoc(q) {
+  F = firmaFor(q);
+  const f = F; const ho = (q.settlement && q.settlement.handover) || {};
+  const works = (ho.works || []).filter((w) => w.name);
+  const rows = works.map((w, i) => `<tr><td class="c">${i + 1}</td><td>${esc(w.name)}</td><td class="c">${w.qty !== '' && w.qty != null ? num(w.qty) : ''}</td><td class="c">${esc(w.unit || '')}</td><td class="c">${w.done === false ? 'ne' : 'ano'}</td></tr>`).join('');
+  const defects = (ho.defects || []).filter((d) => d.text);
+  const defRows = defects.map((d, i) => `<tr><td class="c">${i + 1}</td><td>${esc(d.text)}</td><td class="c">${d.due ? fmtDate(d.due) : ''}</td></tr>`).join('');
+  const decl = ho.noDefects || !defects.length
+    ? 'Objednatel prohlašuje, že dílo převzal bez zjevných vad a nedodělků.'
+    : 'Objednatel dílo převzal s níže uvedenými vadami a nedodělky, které se zhotovitel zavazuje odstranit v uvedených termínech.';
+  const sig = (img, who, name) => `<div style="flex:1"><div style="height:26mm;border-bottom:1px solid #222;display:flex;align-items:flex-end;justify-content:center">${img ? `<img src="${img}" style="max-height:24mm;max-width:100%">` : ''}</div><div style="font-size:9pt;margin-top:1mm"><b>${who}</b><br>${esc(name || '')}</div></div>`;
+  return `<div class="doc">${headBar('PŘEDÁVACÍ PROTOKOL')}
+    <div class="parties"><div class="sup"><div class="lab">Zhotovitel</div><b>${esc(f.name)}</b><div>${esc(f.address)}</div><div>IČO: ${esc(f.ico)}</div><div>${esc(f.email)} · ${esc(f.phone)}</div></div>
+      <div class="cus"><div class="lab">Objednatel</div><b>${esc(q.customer_name || '')}</b><div>${esc(q.customer_address || '')}</div><div>${esc(q.customer_contact || '')}</div></div></div>
+    <div class="boxes"><div><div class="bl">Zakázka</div><div class="bv" style="font-size:10pt">${esc(q.number)}${q.project ? ' – ' + esc(q.project) : ''}</div></div>
+      <div><div class="bl">Datum předání</div><div class="bv">${fmtDate(ho.date || isoToday())}</div></div><div><div class="bl">Záruka</div><div class="bv" style="font-size:10pt">${ho.warranty ? esc(ho.warranty) + ' měs.' : '—'}</div></div></div>
+    <div class="lab" style="margin-top:3mm">Provedené práce</div>
+    <table class="dt"><thead><tr><th>#</th><th class="l">POPIS PRÁCE</th><th>MNOŽSTVÍ</th><th>MJ</th><th>PROVEDENO</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="keep"><div class="lab" style="margin-top:3mm">Zjištěné vady a nedodělky</div>
+    ${defects.length ? `<table class="dt"><thead><tr><th>#</th><th class="l">POPIS</th><th>TERMÍN ODSTRANĚNÍ</th></tr></thead><tbody>${defRows}</tbody></table>` : '<div class="notebox">Žádné.</div>'}
+    <div style="margin-top:3mm;font-size:9.5pt">${decl}</div>
+    ${ho.note ? `<div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(ho.note)}</div>` : ''}
+    <div style="display:flex;gap:12mm;margin-top:8mm">${sig(ho.sigC, 'Objednatel (převzal)', ho.nameC || q.customer_name)}${sig(ho.sigZ, 'Zhotovitel (předal)', ho.nameZ || f.name)}</div>
+    <div style="font-size:8.5pt;margin-top:2mm;color:#555">V ${esc(ho.place || '')} dne ${fmtDate(ho.date || isoToday())}</div>${footer()}</div></div>`;
+}
