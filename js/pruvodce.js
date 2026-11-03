@@ -5,7 +5,7 @@ import { MAT, sponaRe, plan, defaults, parseFormat, triggerRe } from './skladba.
 
 export const guideApplies = (p) => (p.category === 'podlaha' || p.category === 'stena') && triggerRe.test(p.name || '');
 
-const workItem = (code) => S.prices.find((x) => x.category === 'prace' && x.code === code && x.active !== false);
+const workItem = (code) => S.prices.find((x) => ['prace', 'stena', 'podlaha', 'ostatni'].includes(x.category) && x.code === code && x.active !== false);
 const num = (v, d = 0) => { const n = typeof v === 'number' ? v : parseNum(v); return Number.isFinite(n) ? n : d; };
 
 function colorOptions() {
