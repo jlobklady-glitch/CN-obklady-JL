@@ -56,9 +56,11 @@ export function addDays(iso, days) {
 // vyhledávání bez ohledu na diakritiku a velikost písmen
 export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 export function matcher(query) {
-  const tokens = norm(query).split(/\s+/).filter(Boolean);
+  // koncovky se zkracují (dlažba → dlažb), aby „dlazba“ našlo i „dlažby“, „dlažbu“; × a x se berou stejně
+  const fix = (s) => norm(s).replace(/[×*]/g, 'x');
+  const tokens = fix(query).split(/\s+/).filter(Boolean).map((k) => (k.length > 4 && /[aeiouy]$/.test(k) ? k.slice(0, -1) : k));
   return (text) => {
-    const t = norm(text);
+    const t = fix(text);
     return tokens.every((k) => t.includes(k));
   };
 }
