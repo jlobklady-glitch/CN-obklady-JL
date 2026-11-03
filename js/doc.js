@@ -84,7 +84,7 @@ const footer = () => `<div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY 
 export function settlementTotals(q) {
   const st = q.settlement || {};
   const actual = quoteTotal(st.items || []);
-  const offer = quoteTotal(q.items || []);
+  const offer = Number.isFinite(Number(st.offer)) && st.offer !== undefined && st.offer !== null && st.offer !== '' ? Number(st.offer) : quoteTotal(q.items || []); // částka nabídky v době vzniku vyúčtování
   const advance = parseNum(st.advance);
   return { actual, offer, advance, diff: actual - offer, due: actual - advance, bez: !!st.bez };
 }

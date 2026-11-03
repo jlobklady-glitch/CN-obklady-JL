@@ -47,7 +47,8 @@ export async function htmlToPdf(html) {
       const stops = [...part.querySelectorAll('tr, .parties, .boxes, .total, .small, .notebox, .terms, .band, .strip, .foot, .bar, .tag, .stripe, .keep > div')]
         .map((e) => Math.ceil(e.getBoundingClientRect().bottom - top)).sort((a, b) => a - b);
       const total = Math.ceil(part.getBoundingClientRect().height);
-      const canvas = await window.html2canvas(part, { scale: 2, backgroundColor: '#fff', useCORS: true, logging: false, width: W, windowWidth: W });
+      const sc = Math.max(1, Math.min(2, Math.sqrt(12e6 / (W * Math.max(total, 1))))); // limit plochy canvasu na iPhonu (~16 Mpx)
+      const canvas = await window.html2canvas(part, { scale: sc, backgroundColor: '#fff', useCORS: true, logging: false, width: W, windowWidth: W });
       const k = canvas.width / W; // px canvasu na css px
       let y = 0, pageNo = 0;
       while (y < total - 1) {
@@ -73,11 +74,14 @@ export async function htmlToPdf(html) {
 const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
 export const pdfName = (number, who) => `${safe(number)}${who ? ' - ' + safe(who) : ''}.pdf`;
 
-export async function savePdfToDrive(html, name, btn) {
+export async function savePdfToDrive(html, name, btn, pending) {
   if (!driveReady()) return toast('Google Disk není připojen', 'err');
   if (btn) btn.disabled = true;
   try {
-    await ensureDriveToken(); // přihlášení k Googlu hned po kliknutí (jinak ho prohlížeč může zablokovat)
+    const tok = ensureDriveToken(); // přihlášení k Googlu musí začít synchronně po kliknutí (jinak ho prohlížeč zablokuje)
+    tok.catch(() => {});
+    if (pending) await Promise.resolve(pending).catch(() => {}); // rozpracované změny se uloží, zatímco okno přihlášení běží
+    await tok;
     toast('Vytvářím PDF…');
     const blob = await htmlToPdf(html);
     const r = await uploadToDrive(name, blob, 'JL-OBKLADY PDF');

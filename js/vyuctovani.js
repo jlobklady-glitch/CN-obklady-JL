@@ -12,16 +12,18 @@ const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: '
 export async function settlementEditor(root, id) {
   let q;
   try { q = await getQuote(id); } catch (e) { root.replaceChildren(h('div', { class: 'card' }, 'Nenalezeno.')); return; }
-  const st = q.settlement = q.settlement && q.settlement.items ? q.settlement : { ...(q.settlement || {}), items: JSON.parse(JSON.stringify(q.items || [])), advance: 0, note: '' };
+  const isNew = !(q.settlement && q.settlement.items);
+  const st = q.settlement = q.settlement && q.settlement.items ? q.settlement : { ...(q.settlement || {}), items: JSON.parse(JSON.stringify(q.items || [])), advance: 0, note: '', offer: quoteTotal(q.items || []), date: isoToday() };
   const bez = !!st.bez;
   const state = h('span', { class: 'savestate' }, 'Uloženo');
   const saver = makeSaver((f) => saveQuote(q, f), 'Toto vyúčtování', state);
+  if (isNew) saver.touch(); // nové vyúčtování se hned uloží (datum a částka nabídky se tak nemění zpětně)
   const sums = h('div', { class: 'card' });
   const drawSums = () => {
     const t = settlementTotals(q);
     const line = (l, v, b) => h('div', { class: 'row between', style: { padding: '3px 0', fontWeight: b ? 800 : 400 } }, h('span', null, l), h('span', null, v));
-    sums.replaceChildren(!bez && line(`Celkem dle nabídky ${q.number}`, kc(t.offer)), !bez && line('Rozdíl oproti nabídce', kc(t.diff)),
-      line('Celkem skutečně', kc(t.actual), true), t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true));
+    sums.replaceChildren(...[!bez && line(`Celkem dle nabídky ${q.number}`, kc(t.offer)), !bez && line('Rozdíl oproti nabídce', kc(t.diff)),
+      line('Celkem skutečně', kc(t.actual), true), t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true)].filter(Boolean));
   };
   const touch = () => { saver.touch(); drawSums(); };
   window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;
@@ -63,14 +65,14 @@ export async function settlementEditor(root, id) {
     h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/nabidky' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
-      h('button', { class: 'btn ghost small', onclick: async (e) => { await saver.flush(); savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target); } }, 'PDF na Disk'),
+      h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
     bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
       fld('Datum vyúčtování', h('input', { type: 'date', value: st.date || isoToday(), oninput: bind(st, 'date') })),
       fld('Uhrazená záloha (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: st.advance || '', oninput: bind(st, 'advance', true) })),
-      !bez && h('div', null, h('label', { class: 'f' }, ' '), h('button', { class: 'btn ghost', onclick: async () => { if (await confirmBox('Přepsat položky vyúčtování znovu podle nabídky?')) { st.items.splice(0, st.items.length, ...JSON.parse(JSON.stringify(q.items || []))); ed.redraw(); touch(); } } }, 'Načíst znovu z nabídky')))),
+      !bez && h('div', null, h('label', { class: 'f' }, ' '), h('button', { class: 'btn ghost', onclick: async () => { if (await confirmBox('Přepsat položky vyúčtování znovu podle nabídky?')) { st.items.splice(0, st.items.length, ...JSON.parse(JSON.stringify(q.items || []))); st.offer = quoteTotal(q.items || []); ed.redraw(); touch(); } } }, 'Načíst znovu z nabídky')))),
     h('div', { class: 'card' }, h('h2', null, 'Skutečně provedené položky'), ed.box,
       h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: () => ed.add() }, '+ Přidat řádek'))),
     sums,
@@ -93,7 +95,7 @@ export async function invoiceEditor(root, id) {
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Faktura ' + inv.number), state,
-      h('button', { class: 'btn ghost small', onclick: async (e) => { await isaver.flush(); savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target); } }, 'PDF na Disk'),
+      h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target, isaver.flush()); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await isaver.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },

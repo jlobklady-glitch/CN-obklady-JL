@@ -1,6 +1,6 @@
 // Záloha a obnova všech dat do jednoho souboru (JSON). Soubor lze uložit na Google Disk přes „Sdílet / Uložit“ v telefonu.
 import { sb, loadAll, markBackupDone } from './store.js';
-import { driveReady, uploadToDrive } from './drive.js';
+import { driveReady, uploadToDrive, ensureDriveToken } from './drive.js';
 
 const TABLES = [['settings', 'key'], ['contacts', 'id'], ['price_items', 'id'], ['quotes', 'id'], ['invoices', 'id'], ['records', 'id']];
 
@@ -57,7 +57,10 @@ export async function restoreBackup(file, onProgress) {
 // Záloha na Google Disk (a zapsání data poslední zálohy)
 export async function backupToDrive() {
   if (!driveReady()) throw new Error('Google Disk není připojen.');
+  const tok = ensureDriveToken(); // přihlášení k Googlu hned po kliknutí, dřív než se začnou stahovat data
+  tok.catch(() => {});
   const b = await buildBackup();
+  await tok;
   const r = await uploadToDrive(b.name, b.blob);
   await markBackupDone().catch(() => {});
   return { name: r.name, counts: b.counts };

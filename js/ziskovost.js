@@ -23,6 +23,12 @@ export async function ziskView(root) {
     const costs = material + work + other;
     return { q, revenue, material, work, other, costs, profit: revenue - costs, hours };
   });
+  const known = new Set(quotes.map((q) => key(q.number)));
+  const orphan = (arr) => arr.filter((r) => !known.has(key(r.data.quote)));
+  const oMat = orphan(S.rec.stock_out || []).reduce((t, r) => t + n(r.data.qty) * (avg[r.data.product] || 0), 0);
+  const oWork = orphan(S.rec.hours || []).reduce((t, r) => t + n(r.data.hours) * rate(r), 0);
+  const oOth = orphan(S.rec.cost || []).reduce((t, r) => t + n(r.data.amount), 0);
+  const oCnt = orphan(S.rec.stock_out || []).length + orphan(S.rec.hours || []).length + orphan(S.rec.cost || []).length;
   const T = (f) => rows.reduce((t, r) => t + r[f], 0);
   const pct = (a, b) => (b > 0 ? String(Math.round((a / b) * 1000) / 10).replace('.', ',') + ' %' : '—');
   const perHour = (r) => (r.hours > 0 ? kc(r.profit / r.hours) : '—');
@@ -30,6 +36,7 @@ export async function ziskView(root) {
   const tr = (cells, bold) => h('tr', { style: bold ? { fontWeight: 800 } : null }, cells.map((c, i) => h('td', { class: i >= 3 ? 'r' : '' }, c)));
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Ziskovost zakázek')),
+    ...(oMat + oWork + oOth > 0 ? [h('div', { class: 'banner' }, `Pozor: ${oCnt} záznamů (materiál ${kc(oMat)}, práce ${kc(oWork)}, ostatní ${kc(oOth)}) nemá platné číslo nabídky, a proto se nezapočítalo do žádné zakázky. Zkontrolujte pole „Zakázka“ ve Skladu, Hodinách a Nákladech.`)] : []),
     h('p', { class: 'muted' }, 'Počítá se samo: tržba (vyúčtování, jinak nabídka) − materiál (spotřeba ze skladu) − práce (hodiny × sazba) − ostatní náklady. Zakázky se k záznamům přiřazují podle čísla nabídky zadaného ve Skladu, Hodinách a Nákladech. Zamítnuté nabídky se nezapočítávají.'),
     h('div', { class: 'tablewrap' }, h('table', { class: 't' },
       h('thead', null, h('tr', null, cols.map((c, i) => h('th', { class: i >= 3 ? 'r' : '' }, c)))),

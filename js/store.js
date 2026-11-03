@@ -378,6 +378,16 @@ export async function loadRecords(kind) {
   S.rec[kind] = out;
   return out;
 }
+// přejmenování pracovníka: přepíše jméno i ve starých záznamech (hodiny, náklady, příjmy), aby nezůstaly osiřelé
+export async function renameWorkerRecords(pairs) {
+  let n = 0;
+  if (!pairs.length) return n;
+  for (const [kind, key] of [['hours', 'worker'], ['cost', 'payer'], ['stock_in', 'payer']]) {
+    const rows = await loadRecords(kind);
+    for (const r of rows) for (const [a, b] of pairs) if (r.data && r.data[key] === a) { r.data[key] = b; await saveRecord(r); n++; }
+  }
+  return n;
+}
 export async function addRecord(kind, data = {}, date = isoToday()) {
   const { data: r, error } = await sb.from('records').insert({ kind, rec_date: date, data }).select().single();
   if (error) throw error;

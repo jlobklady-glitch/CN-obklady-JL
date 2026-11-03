@@ -3,7 +3,7 @@ import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
 import { importButtons } from './cenikimport.js';
-import { patchPrice, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
+import { renameWorkerRecords, patchPrice, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
   let q = '';
@@ -145,7 +145,12 @@ export function settingsView(root) {
     for (const k of ['mapei_discount', 'kabe_markup']) { // 28 → 0,28 (zadáno v procentech)
       let x = Number(f[k]) || 0; if (x >= 1) x /= 100; f[k] = Math.min(Math.max(x, 0), 1);
     }
-    try { await saveFirmaMerged(orig, f); orig = JSON.parse(JSON.stringify(f)); toast('Uloženo'); } catch (e) { toast(e.message, 'err'); }
+    try {
+      const pairs = (orig.workers || []).map((a, i) => [a, f.workers[i]]).filter(([a, b]) => a && b && a !== b);
+      await saveFirmaMerged(orig, f); orig = JSON.parse(JSON.stringify(f));
+      const moved = await renameWorkerRecords(pairs);
+      toast(moved ? `Uloženo, přejmenováno v ${moved} záznamech` : 'Uloženo');
+    } catch (e) { toast(e.message, 'err'); }
   };
   const pw = h('input', { type: 'password', placeholder: 'Nové heslo (min. 8 znaků)' });
   const imp = h('div', { class: 'muted' });
