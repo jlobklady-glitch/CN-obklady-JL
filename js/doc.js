@@ -99,7 +99,7 @@ export function settlementDoc(q) {
   const sum = [];
   if (!t.bez) sum.push(['Celkem dle nabídky ' + esc(q.number), kc(t.offer)], ['Rozdíl oproti nabídce', kc(t.diff)]);
   if (t.advance) sum.push(['Uhrazená záloha', kc(-t.advance)]);
-  return `<div class="doc">${headBar('FINÁLNÍ VYÚČTOVÁNÍ')}${partiesHtml(q)}
+  return `<div class="doc">${headBar('KONEČNÉ VYÚČTOVÁNÍ')}${partiesHtml(q)}
     <div class="boxes"><div><div class="bl">K nabídce č.</div><div class="bv">${t.bez ? 'bez CN' : esc(q.number)}</div></div>
       <div><div class="bl">Datum vyúčtování</div><div class="bv">${fmtDate(st.date || isoToday())}</div></div>
       <div><div class="bl">Stavba</div><div class="bv" style="font-size:10pt">${esc(q.project)}</div></div></div>

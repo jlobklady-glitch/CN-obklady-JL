@@ -130,8 +130,8 @@ export function openGuide({ item, row, onDone }) {
   drawWet();
   const dlg = h('div', { class: 'modal-back', style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' } },
     h('div', { class: 'card', style: { maxWidth: '720px', width: '100%', maxHeight: '94vh', overflow: 'auto' } },
-      h('h2', null, 'Průvodce skladby: ' + (mode === 'podlaha' ? 'dlažba na podlaze' : 'obklad na stěně')),
-      h('p', { class: 'muted' }, `Zvolená položka: ${item.name}. Průvodce navrhne navazující práce a materiál MAPEI podle plochy. Řádky odškrtněte, nebo upravte množství. ⚠ = údaj není z technického listu, jen odhad – zkontrolujte.`),
+      h('h2', null, 'Průvodce skladbou: ' + (mode === 'podlaha' ? 'dlažba na podlaze' : 'obklad na stěně')),
+      h('p', { class: 'muted' }, `Zvolená položka: ${item.name}. Průvodce navrhne navazující práce a materiál MAPEI podle plochy. U nepotřebných řádků zrušte zaškrtnutí nebo upravte množství. ⚠ = údaj není z technického listu, jen odhad – zkontrolujte.`),
       h('div', { class: 'grid c3' },
         num_('A', 'Plocha (m²)'), num_('fa', 'Formát – strana A (cm)'), num_('fb', 'Formát – strana B (cm)'),
         num_('thick', 'Tloušťka dlaždice (mm)'), num_('joint', 'Šířka spáry (mm)'), num_('perim', 'Obvod (bm) – prázdné = odhad'),

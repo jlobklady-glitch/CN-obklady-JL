@@ -239,7 +239,7 @@ function showPracePlan(pl, done) {
 
 // Zabudovaný ceník je potřeba načíst, dokud v databázi chybí nové položky nebo zůstávají staré duplicity.
 export const OBSOLETE_CODES = ['LOG-007', 'HYDR-016', 'HYDR-017', 'HYDR-018', 'HYDR-019', 'HYDR-020', 'HYDR-021', 'HYDR-025'];
-export const bundledPending = () => !S.prices.some((p) => p.code === 'PRI-001') || !S.prices.some((p) => p.code === 'SPD-001') || S.prices.some((p) => OBSOLETE_CODES.includes(p.code));
+export const bundledPending = () => !S.prices.some((p) => p.code === 'PRI-001') || !S.prices.some((p) => p.code === 'SPD-001') || S.prices.some((p) => OBSOLETE_CODES.includes(p.code)) || S.prices.some((p) => /XXL mega|tanyn|bobtnajícím/.test(p.name || ''));
 export async function openBundledPrace(done) {
   try {
     toast('Načítám ceník z aplikace…');

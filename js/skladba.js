@@ -100,7 +100,7 @@ export function plan(P) {
     const An = Math.max(A - showerA, 0);
     const sh = showerA > 0 ? ` (bez sprchového koutu ${r2(showerA)} m² – tam se nivelace nedělá, řeší ji spádový potěr)` : '';
     if (P.nivGrind) {
-      add({ id: 'ngr', group: 'Nivelace', kind: 'work', code: 'NIV-007', name: 'Broušení / frézování podkladu před nivelací', unit: 'm²', qty: An, ok: true, note: 'dle potřeby (zaškrtnuto ručně) – množství upravte na skutečně brušenou plochu' });
+      add({ id: 'ngr', group: 'Nivelace', kind: 'work', code: 'NIV-007', name: 'Broušení / frézování podkladu před nivelací', unit: 'm²', qty: An, ok: true, note: 'dle potřeby (zaškrtnuto ručně) – množství upravte na skutečně broušenou plochu' });
       add({ id: 'nvac', group: 'Nivelace', kind: 'work', code: 'UKL-009', name: 'Vysátí prachu po broušení před nivelací', unit: 'm²', qty: An, ok: true });
     }
     if (P.nivCrack) {
