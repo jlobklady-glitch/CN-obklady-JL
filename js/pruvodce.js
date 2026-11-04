@@ -131,6 +131,7 @@ export function openGuide({ item, row, onDone }) {
       sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'liniový / sprchový žlab'], ['vpust', 'podlahová vpusť (gula) / bodový odtok']], () => drawWet()),
       P.drain === 'zlab' ? sel('drainType', 'Typ žlabu', [['zed', 'u zdi'], ['roh', 'v rohu'], ['prostor', 'volně v prostoru'], ['vzed', 'integrovaný ve zdi']]) : null, P.drain === 'zlab' ? num_('drainLen', 'Délka žlabu (bm)') : null,
       P.drain === 'vpust' ? num_('drainN', 'Počet vpustí (ks)') : null,
+      P.drain === 'vpust' ? num_('drainPlanes', 'Spádové roviny na jednu vpusť (čtvercová = 4)') : null,
       P.drain === 'vpust' ? num_('drainSlopeA', 'Plocha spádování dlažby k vpusti (m², prázdné = celá plocha)') : null,
       sel('hydro', 'Hydroizolace', [['wps', 'tekutá Mapegum WPS – plocha + pásky do koutů'], ['smart', 'cementová Mapelastic Smart (podlaha) + Mapegum WPS (stěny)'], ['wp200', 'PREMIUM: folie Mapeguard WP 200 (podlaha i stěny)']], () => drawWet()),
       P.hydro === 'wp200' ? sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]) : null,

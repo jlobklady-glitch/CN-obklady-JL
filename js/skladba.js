@@ -64,7 +64,7 @@ export function defaults(p, mode) {
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
-    vacOn: true, grind: false, floorHyd: 'none', hydroOn: false, drainN: 1, drainSlopeA: '',
+    vacOn: true, grind: false, floorHyd: 'none', hydroOn: false, drainN: 1, drainSlopeA: '', drainPlanes: 4,
     sokl: false, soklH: 8, soklBm: '', soklIn: 4, soklOut: 0,
     scrape: true, levOn: false, levType: 'lepidlo', levA: '', levT: 3, otvory: 0,
     niche: false, nicheN: 1, nicheW: 30, nicheH: 60, nicheD: 10, nicheLed: false, nicheEdge: 'lista',
@@ -177,7 +177,9 @@ export function plan(P) {
     // podlahová vpusť (gula): dlažba se řeže do klínů a spáduje k vpusti (ve sprše se spádování řeší výše)
     if (floor && P.drain === 'vpust' && !(sl > 0)) {
       const sa = Number(P.drainSlopeA) || A;
-      add({ id: 'vpsl', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'SPD-003', name: 'Spádování dlažby k podlahové vpusti – řezání do klínů', unit: 'm²', qty: r2(sa), ok: true, note: 'dlažba se řeže do klínů a spáduje k vpusti – počítejte vyšší odpad dlažby (rezerva v nabídce dlažby)' });
+      add({ id: 'vpsl', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'SPD-003', name: 'Spádování dlažby k podlahové vpusti – řezání do klínů', unit: 'm²', qty: r2(sa), ok: true, note: 'dlažba se přesně řeže podle skladby spádu: kolem vpusti 4 klínové kusy, dále od ní 2 kusy spádované proti sobě' });
+      const pl = Math.max(Math.round(Number(P.drainPlanes) || 4), 1) * Math.max(Number(P.drainN) || 1, 1);
+      add({ id: 'vpsl2', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'SPD-004', name: 'Příplatek za spádovou rovinu u podlahové vpusti', unit: 'ks', qty: pl, ok: true, note: `${Math.max(Math.round(Number(P.drainPlanes) || 4), 1)} spádové roviny na vpusť (u čtvercové vpusti 4 – ze 4 rohů) × ${Math.max(Number(P.drainN) || 1, 1)} vpusť` });
     }
     if (floor && P.drain === 'zlab') {
       add({ id: 'zlab', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-024', name: 'Montáž sprchového nerezového žlabu vč. usazení a napojení', unit: 'ks', qty: 1, ok: true, note: 'typ žlabu zatím nemění cenu práce – dejte vědět, jaké jsou přirážky (volně v prostoru / roh / u zdi / ve zdi)' });
