@@ -102,7 +102,7 @@ export function settlementDoc(q) {
   const st = q.settlement || {};
   const items = (st.items || []).filter((r) => r.name);
   const t = settlementTotals(q);
-  const pct = (x) => (x > 0.0005 ? Math.round(x * 1000) / 10 + ' %' : '');
+  const pct = (x) => (x > 0.0005 ? String(Math.round(x * 1000) / 10).replace('.', ',') + ' %' : '');
   const rows = items.map((r, i) => {
     const p = parseNum(r.price), d = Math.min(Math.max(parseNum(r.disc), 0), 1);
     const after = Math.round(p * (1 - d) * 100) / 100;
