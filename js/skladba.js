@@ -64,7 +64,7 @@ export function defaults(p, mode) {
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
-    vacOn: true, grind: false, floorHyd: 'none', hydroOn: false, drainN: 1,
+    vacOn: true, grind: false, floorHyd: 'none', hydroOn: false, drainN: 1, drainSlopeA: '',
     sokl: false, soklH: 8, soklBm: '', soklIn: 4, soklOut: 0,
     scrape: true, levOn: false, levType: 'lepidlo', levA: '', levT: 3, otvory: 0,
     niche: false, nicheN: 1, nicheW: 30, nicheH: 60, nicheD: 10, nicheLed: false, nicheEdge: 'lista',
@@ -173,6 +173,11 @@ export function plan(P) {
       add({ id: 'slope', group: 'Spádování sprchového koutu', kind: 'work', code: 'SPD-001', name: 'Spádování sprchy – spádový potěr Topcem Pronto', unit: 'm²', qty: r2(sl), ok: true, note: `sprcha ${L}×${W} cm = ${r2(sl)} m² (minimum 80×80 cm)` });
       add({ id: 'm_slope', group: 'Spádování sprchového koutu', kind: 'mat', mat: 'topcem', need: sl * t * 20 * (1 + rs / 100), needUnit: 'kg', name: MAT.topcem.label, ok: true, note: `TL: 18–20 kg/m² na 1 cm (použito 20); ${r2(sl)} m² × prům. ${t} cm; před pokládkou počkat 24 h, zbytková vlhkost < 2 % po 4 dnech` });
       add({ id: 'slopeT', group: 'Spádování sprchového koutu', kind: 'work', code: 'SPD-002', name: 'Spádování dlažby ve sprše', unit: 'm²', qty: r2(sl), ok: true, note: 'nařezání dlažby do spádu a klínů kolem žlabu' });
+    }
+    // podlahová vpusť (gula): dlažba se řeže do klínů a spáduje k vpusti (ve sprše se spádování řeší výše)
+    if (floor && P.drain === 'vpust' && !(sl > 0)) {
+      const sa = Number(P.drainSlopeA) || A;
+      add({ id: 'vpsl', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'SPD-003', name: 'Spádování dlažby k podlahové vpusti – řezání do klínů', unit: 'm²', qty: r2(sa), ok: true, note: 'dlažba se řeže do klínů a spáduje k vpusti – počítejte vyšší odpad dlažby (rezerva v nabídce dlažby)' });
     }
     if (floor && P.drain === 'zlab') {
       add({ id: 'zlab', group: 'Sprchový žlab / vpusť', kind: 'work', code: 'HYDR-024', name: 'Montáž sprchového nerezového žlabu vč. usazení a napojení', unit: 'ks', qty: 1, ok: true, note: 'typ žlabu zatím nemění cenu práce – dejte vědět, jaké jsou přirážky (volně v prostoru / roh / u zdi / ve zdi)' });
