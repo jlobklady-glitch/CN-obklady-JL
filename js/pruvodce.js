@@ -70,12 +70,13 @@ export function buildRows(P) {
   return out;
 }
 
-export function openGuide({ item, row, onDone }) {
+export function openGuide({ item, row, onDone, initial }) {
   const mode = item.category === 'podlaha' ? 'podlaha' : 'stena';
   const P = defaults(item, mode);
   P.A = num(row.qty) > 1 ? num(row.qty) : '';
+  if (initial && initial.P) Object.assign(P, initial.P);
   const fmt = parseFormat(item.name);
-  const off = new Set(); const ovr = {};
+  const off = new Set(initial && initial.off || []); const ovr = { ...(initial && initial.ovr || {}) };
   const listBox = h('div'); const totalEl = h('b');
   const redraw = () => {
     const rows = buildRows({ ...P, A: num(P.A), perim: num(P.perim) });
@@ -142,7 +143,7 @@ export function openGuide({ item, row, onDone }) {
   drawWet();
   const dlg = h('div', { class: 'modal-back', style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' } },
     h('div', { class: 'card', style: { maxWidth: '720px', width: '100%', maxHeight: '94vh', overflow: 'auto' } },
-      h('h2', null, 'Průvodce skladbou: ' + (mode === 'podlaha' ? 'dlažba na podlaze' : 'obklad na stěně')),
+      h('h2', null, (initial ? 'Úprava skladby: ' : 'Průvodce skladbou: ') + (mode === 'podlaha' ? 'dlažba na podlaze' : 'obklad na stěně')),
       h('p', { class: 'muted' }, `Zvolená položka: ${item.name}. Průvodce navrhne navazující práce a materiál MAPEI podle plochy. U nepotřebných řádků zrušte zaškrtnutí nebo upravte množství. ⚠ = údaj není z technického listu, jen odhad – zkontrolujte.`),
       h('div', { class: 'grid c3' },
         num_('A', 'Plocha (m²)'), num_('fa', 'Formát – strana A (cm)'), num_('fb', 'Formát – strana B (cm)'),
@@ -196,10 +197,10 @@ export function openGuide({ item, row, onDone }) {
             if (r.premium) { delete r.premium; prem.push(r); } else base.push(r);
           }
           if (!base.length && !prem.length) return toast('Nic k přidání', 'err');
-          onDone({ base, prem, area: num(P.A) });
+          onDone({ base, prem, area: num(P.A), state: { P: { ...P }, off: [...off], ovr: { ...ovr } }, fmt: [num(P.fa), num(P.fb)] });
           dlg.remove();
           toast(`Přidáno ${base.length} řádků${prem.length ? ' + ' + prem.length + ' do PREMIUM' : ''}`);
-        } }, 'Přidat do nabídky'))));
+        } }, initial ? 'Uložit změny skladby' : 'Přidat do nabídky'))));
   document.body.appendChild(dlg);
   redraw();
 }

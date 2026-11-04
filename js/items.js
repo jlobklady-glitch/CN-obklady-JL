@@ -33,7 +33,7 @@ export function suggestBox(input, onPick, filter = () => true) {
 }
 
 // items: pole řádků (upravuje se přímo), onTouch: volá se po každé změně
-export function itemsEditor(items, onTouch, onPick) {
+export function itemsEditor(items, onTouch, onPick, extra) {
   const box = h('div', { class: 'items' });
   const totalV = h('div', { class: 'v' });
   const recalc = () => { totalV.textContent = kc(quoteTotal(items)); };
@@ -66,7 +66,7 @@ export function itemsEditor(items, onTouch, onPick) {
       upd();
       if (onPick) onPick(p, r);
     });
-    return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug), h('div', { class: 'c-mj', 'data-l': 'MJ' }, unitIn),
+    return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug, extra ? extra(r) : null), h('div', { class: 'c-mj', 'data-l': 'MJ' }, unitIn),
       h('div', { class: 'c-qty', 'data-l': 'Množství' }, qtyIn), h('div', { class: 'c-price', 'data-l': 'Cena / MJ' }, priceIn), h('div', { class: 'c-disc', 'data-l': 'Sleva %' }, discIn), tot,
       h('div', { class: 'c-del' }, h('button', { class: 'del', title: 'Smazat řádek', onclick: () => { items.splice(i, 1); draw(); onTouch(); } }, '×')));
   };

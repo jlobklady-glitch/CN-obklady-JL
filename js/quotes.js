@@ -5,6 +5,7 @@ import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, disp
 import { quoteDoc, printDoc } from './doc.js';
 import { itemsEditor } from './items.js';
 import { guideApplies, openGuide } from './pruvodce.js';
+import { parseFormat, triggerRe } from './skladba.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 
 const stavCls = { 'Dokončena': 'ok', 'Zamítnuta': 'bad', 'Potvrzena': 'blue', 'V realizaci': 'blue', 'Nabídka zaslána': 'gold' };
@@ -62,15 +63,37 @@ export async function quoteEditor(root, id) {
   } }, h('option', { value: '' }, '— vybrat z kontaktů / vyplnit ručně —'), S.contacts.map((c) => h('option', { value: c.id, selected: c.id === q.customer_id }, `${c.name} (${c.kind})`)));
   showIds();
 
-  const ed = itemsEditor(q.items, touch, (p, r) => {
-    if (!guideApplies(p)) return;
-    openGuide({ item: p, row: r, onDone: ({ base, prem, area }) => {
-      if (!(parseNum(r.qty) > 1)) r.qty = area;
-      const at = q.items.indexOf(r) + 1; q.items.splice(at, 0, ...base);
-      if (prem.length) { q.premium = true; q.premium_items = q.premium_items || []; q.premium_items.push(...prem); }
-      ed.redraw(); touch(); drawPremium();
-    } });
-  });
+  // Průvodce skladbou: vytvořené řádky se označí (g), aby šly při úpravě skladby nahradit novou verzí
+  const gidNew = () => 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const runGuide = (p, r, initial) => openGuide({ item: p, row: r, initial, onDone: ({ base, prem, area, state, fmt }) => {
+    const gid = r.gid || gidNew(); r.gid = gid; r.gstate = state;
+    if (initial) {
+      const keep = q.items.filter((x) => x === r || x.g !== gid); q.items.splice(0, q.items.length, ...keep);
+      q.premium_items = q.premium_items || []; const keepP = q.premium_items.filter((x) => x.g !== gid); q.premium_items.splice(0, q.premium_items.length, ...keepP);
+      // změnil se formát → hlavní řádek přepnout na odpovídající položku ceníku
+      const mine = (a) => (a && a[0] && a[1]) ? [...a].sort().join('x') : '';
+      const want = mine(fmt), have = mine(parseFormat(r.name));
+      if (want && want !== have) {
+        const alt = S.prices.find((x) => x.active && x.category === p.category && triggerRe.test(x.name || '') && mine(parseFormat(x.name)) === want);
+        if (alt) { r.item_id = alt.id; r.name = displayName(alt); r.unit = displayUnit(alt); r.typ = alt.category; r.price = priceFor(alt, area); }
+        else toast('Pro formát ' + fmt[0] + '×' + fmt[1] + ' není v ceníku položka – hlavní řádek zůstává beze změny', 'err');
+      }
+      r.qty = area;
+    } else if (!(parseNum(r.qty) > 1)) r.qty = area;
+    base.forEach((x) => { x.g = gid; }); prem.forEach((x) => { x.g = gid; });
+    const at = q.items.indexOf(r) + 1; q.items.splice(at, 0, ...base);
+    if (prem.length) { q.premium = true; q.premium_items = q.premium_items || []; q.premium_items.push(...prem); }
+    ed.redraw(); touch(); drawPremium();
+  } });
+  const ed = itemsEditor(q.items, touch, (p, r) => { if (guideApplies(p)) { r.gid = null; r.gstate = null; runGuide(p, r); } },
+    (r) => {
+      const p = r.item_id && S.prices.find((x) => x.id === r.item_id);
+      if (!p || !guideApplies(p)) return null;
+      return h('button', { class: 'btn ghost small', type: 'button', style: { marginTop: '4px' }, onclick: async () => {
+        if (r.gstate && !(await confirmBox('Řádky vytvořené průvodcem se přepočítají podle nových údajů. Ručně upravená množství a ceny v nich se přepíšou. Pokračovat?'))) return;
+        runGuide(p, r, r.gstate || { P: {}, off: [], ovr: {} });
+      } }, r.gstate ? 'Upravit skladbu' : 'Průvodce skladbou');
+    });
   const itemsBox = ed.box, totalV = ed.totalV;
 
   // --- varianta Premium
