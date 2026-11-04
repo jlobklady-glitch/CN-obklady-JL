@@ -89,13 +89,28 @@ export function settlementTotals(q) {
   return { actual, offer, advance, diff: actual - offer, due: actual - advance, bez: !!st.bez };
 }
 
+// ceníková cena za MJ u materiálu MAPEI (podle položky ceníku); jinak cena řádku
+function listPrice(r) {
+  if (r.typ !== 'mapei' || !r.item_id) return null;
+  const p = S.prices.find((x) => x.id === r.item_id);
+  if (!p || !(Number(p.price) > 0)) return null;
+  const l = Number(p.price) / (Number(r.roll) || 1);
+  return l >= parseNum(r.price) ? l : null;
+}
 export function settlementDoc(q) {
   F = firmaFor(q);
   const st = q.settlement || {};
   const items = (st.items || []).filter((r) => r.name);
   const t = settlementTotals(q);
-  const rows = items.map((r, i) => `<tr><td class="c">${i + 1}</td><td class="typ">${esc(typeLabel(r.typ))}</td><td>${esc(r.name)}</td><td class="c">${esc(r.unit)}</td>
-    <td class="c">${num(r.qty)}</td><td class="r">${kc(r.price)}</td><td class="c">${parseNum(r.disc) ? Math.round(parseNum(r.disc) * 1000) / 10 + ' %' : ''}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`).join('');
+  const pct = (x) => (x > 0.0005 ? Math.round(x * 1000) / 10 + ' %' : '');
+  const rows = items.map((r, i) => {
+    const p = parseNum(r.price), d = Math.min(Math.max(parseNum(r.disc), 0), 1);
+    const after = Math.round(p * (1 - d) * 100) / 100;
+    const list = listPrice(r) ?? p;
+    const sl = list > 0 ? 1 - after / list : 0;
+    return `<tr><td class="c">${i + 1}</td><td class="typ">${esc(typeLabel(r.typ))}</td><td>${esc(r.name)}</td><td class="c">${esc(r.unit)}</td>
+    <td class="c">${num(r.qty)}</td><td class="r">${kc(Math.round(list * 100) / 100)}</td><td class="c">${pct(sl)}</td><td class="r">${kc(after)}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`;
+  }).join('');
   const sum = [];
   if (!t.bez) sum.push(['Celkem dle nabídky ' + esc(q.number), kc(t.offer)], ['Rozdíl oproti nabídce', kc(t.diff)]);
   if (t.advance) sum.push(['Uhrazená záloha', kc(-t.advance)]);
@@ -103,7 +118,7 @@ export function settlementDoc(q) {
     <div class="boxes"><div><div class="bl">K nabídce č.</div><div class="bv">${t.bez ? 'bez CN' : esc(q.number)}</div></div>
       <div><div class="bl">Datum vyúčtování</div><div class="bv">${fmtDate(st.date || isoToday())}</div></div>
       <div><div class="bl">Stavba</div><div class="bv" style="font-size:10pt">${esc(q.project)}</div></div></div>
-    <table class="dt"><thead><tr><th>#</th><th class="l">TYP</th><th class="l">POLOŽKA</th><th>MJ</th><th>MNOŽSTVÍ</th><th>CENA / MJ</th><th>SLEVA</th><th>CELKEM</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="dt"><thead><tr><th>#</th><th class="l">TYP</th><th class="l">POLOŽKA</th><th>MJ</th><th>MNOŽSTVÍ</th><th>CENÍKOVÁ CENA / MJ</th><th>SLEVA</th><th>CENA PO SLEVĚ / MJ</th><th>CELKEM</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="keep">${sum.map(([l, v]) => `<div class="total" style="background:var(--sand)"><div class="l" style="background:var(--sand);color:var(--ink)">${l}</div><div class="v" style="background:var(--sand);color:var(--ink)">${v}</div></div>`).join('')}
     <div class="total"><div class="l">${t.advance ? 'DOPLATEK K ÚHRADĚ' : 'CELKEM K ÚHRADĚ'}</div><div class="v">${kc(t.due)}</div></div>
     <div class="small">Dodavatel není plátcem DPH – ceny jsou konečné.</div>
