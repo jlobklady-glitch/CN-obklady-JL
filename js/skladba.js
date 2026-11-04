@@ -312,7 +312,8 @@ export function plan(P) {
     if (soklH <= 10) add({ id: 'skl2', group: 'Sokl', kind: 'work', code: 'KAM-022', name: 'Řezání pásů soklu z dlažby na míru', unit: 'bm', qty: soklBm, ok: true });
     if (sIn > 0) add({ id: 'skl_in', group: 'Sokl', kind: 'work', code: 'KAM-013', label: 'Vnitřní roh soklu – spoj na tupo', name: 'Vnitřní roh soklu – spoj na tupo', unit: 'ks', qty: sIn, ok: true });
     if (sOut > 0) add({ id: 'skl_out', group: 'Sokl', kind: 'work', code: 'KAM-014', label: 'Vnější roh soklu – kamenický roh Jolly 45°', name: 'Vnější roh soklu – kamenický roh Jolly 45°', unit: 'ks', qty: sOut, ok: true });
-    add({ id: 'fab', group: 'Sokl', kind: 'work', code: 'DLZ-052', name: 'Fabionek ze spárovací hmoty po obvodu soklu', unit: 'bm', qty: soklBm, ok: true, note: 'spárovací hmota na fabionek je v rezervě spárovací hmoty' });
+    add({ id: 'fab', group: 'Sokl', kind: 'work', code: 'DLZ-052', name: 'Fabionek ze spárovací hmoty po obvodu soklu', unit: 'bm', qty: soklBm, ok: true, note: 'materiál na fabionek je v samostatném řádku níže (vždy bílá)' });
+    add({ id: 'm_fab', group: 'Sokl', kind: 'mat', mat: 'ultracolor', color: '100', need: soklBm * 0.1 * (1 + rs / 100), needUnit: 'kg', name: 'MAPEI Ultracolor Plus 100 bílá – spárovací hmota na fabionek', ok: false, note: `⚠ odhad 0,1 kg na 1 bm fabionku (zaoblený přechod soklu a dlažby) × ${r2(soklBm)} bm + rezerva ${rs} %; vždy bílá, bez ohledu na odstín spár` });
   }
   if (P.sil || soklOn) {
     const silBm = (soklOn ? soklBm : perim) + dil;

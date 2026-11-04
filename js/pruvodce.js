@@ -22,7 +22,7 @@ export function resolveMat(l, P) {
   const re = l.re || (l.mat ? MAT[l.mat].re : sponaRe(l.joint));
   const spec = l.mat ? MAT[l.mat] : {};
   let c = S.prices.filter((p) => p.category === 'mapei' && p.active !== false && re.test(String(p.name)));
-  if (spec.color) { const k = new RegExp('\\s' + P.groutColor + '\\s'); const cc = c.filter((p) => k.test(String(p.name))); c = cc; }
+  if (spec.color) { const k = new RegExp('\\s' + (l.color || P.groutColor) + '\\s'); const cc = c.filter((p) => k.test(String(p.name))); c = cc; }
   if (spec.minPack) c = c.filter((p) => (Number(p.pack) || 1) >= spec.minPack);
   if (!c.length) return null;
   const best = c.map((p) => { const pack = Number(p.pack) || 1; const n = Math.max(1, Math.ceil(l.need / pack - 1e-9)); return { p, n, cost: n * priceFor(p, n), pack }; })
