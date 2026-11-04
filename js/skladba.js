@@ -64,6 +64,7 @@ export function defaults(p, mode) {
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
+    openDeduct: true, doorN: 0, doorW: 80, doorH: 197, doorDepth: 15, doorSp: false, doorTop: false, winN: 0, winW: 120, winH: 120, winDepth: 15, winSp: false, winTop: true, winSill: 'none', spEdge: 'lista',
     vacOn: true, grind: false, floorHyd: 'none', hydroOn: false, drainN: 1, drainSlopeA: '', drainPlanes: 4,
     sokl: false, soklH: 8, soklBm: '', soklIn: 4, soklOut: 0,
     scrape: true, levOn: false, levType: 'lepidlo', levA: '', levT: 3, otvory: 0,
@@ -71,12 +72,31 @@ export function defaults(p, mode) {
   };
 }
 
+// dveře, okna, špalety, parapety (obklad na stěně); rozměry v cm
+export function openings(P) {
+  const n = (k) => Math.max(Number(P[k]) || 0, 0);
+  const dN = n('doorN'), wN = n('winN');
+  const dW = n('doorW') / 100, dH = n('doorH') / 100, dD = n('doorDepth') / 100, wW = n('winW') / 100, wH = n('winH') / 100, wD = n('winDepth') / 100;
+  const edgeD = P.doorSp ? dN * (2 * dH + (P.doorTop ? dW : 0)) : 0;
+  const edgeW = P.winSp ? wN * (2 * wH + (P.winTop ? wW : 0)) : 0;
+  const sillBm = P.winSill && P.winSill !== 'none' ? wN * wW : 0;
+  return { deduct: P.openDeduct !== false ? dN * dW * dH + wN * wW * wH : 0, edge: edgeD + edgeW, areaSp: edgeD * dD + edgeW * wD,
+    sillBm, sillA: P.winSill === 'obklad' ? wN * wW * wD : 0, wN, dN };
+}
+// plocha obkladu po odečtu otvorů a přičtení špalet a parapetů (u dlažby beze změny)
+export const effArea = (P) => {
+  const A = Number(P.A) || 0;
+  if (P.mode === 'podlaha') return A;
+  const o = openings(P);
+  return Math.max(A - o.deduct + o.areaSp + o.sillA, 0);
+};
+
 const up = (x, n = 1) => Math.ceil(x * (1 + n / 100) - 1e-9);
 const r2 = (x) => Math.round(x * 100) / 100;
 
 // Vrací řádky návrhu. kind: work (kód z ceníku prací) | mat (materiál MAPEI, need v kg/ml/bm/ks) | other (bez ceny, doplnit)
 export function plan(P) {
-  const L = []; const A = Number(P.A) || 0;
+  const L = []; const A = effArea(P);
   if (A <= 0) return L;
   const rs = Number(P.reserve) || 0;
   const perim = Number(P.perim) || Math.round(4 * Math.sqrt(A) * 10) / 10;
@@ -159,6 +179,25 @@ export function plan(P) {
     else if (P.nicheEdge === 'lista') {
       add({ id: 'nedge', group: 'Nika', kind: 'work', code: 'KAM-008', name: 'Montáž ukončovací lišty po obvodu niky', unit: 'bm', qty: r2(nichePer), ok: true });
       add({ id: 'o_nedge', group: 'Nika', kind: 'other', need: r2(nichePer * 1.05), needUnit: 'bm', name: 'Ukončovací lišta kolem niky (materiál)', unit: 'bm', qty: r2(nichePer * 1.05), ok: false, note: 'není v ceníku – doplňte cenu (+ 5 % odřezky)' });
+    }
+  }
+  if (!floor) {
+    const o = openings(P);
+    const mxf = Math.max(Number(P.fa) || 0, Number(P.fb) || 0);
+    const jol = mxf <= 60 ? 'JOL-002' : mxf <= 160 ? 'JOL-003' : 'JOL-004';
+    const G = 'Dveře, okna, špalety';
+    if (o.edge > 0) {
+      add({ id: 'spal', group: G, kind: 'work', code: 'OBK-041', name: 'Lícování dořezů obkladu u špalet dveří a oken', unit: 'bm', qty: r2(o.edge), ok: true, note: `plocha obkládaných špalet ${r2(o.areaSp)} m² je započtena do plochy obkladu` });
+      if (P.spEdge === 'jolly') add({ id: 'spedge', group: G, kind: 'work', code: jol, label: 'Kamenický roh 45° (Jolly) na vnějším rohu špalet', name: 'Kamenický roh 45° (Jolly) na vnějším rohu špalet', unit: 'bm', qty: r2(o.edge), ok: true, note: 'vnější roh do místnosti; pro keramiku / přírodní kámen zvolte JOL-001 / JOL-005 ručně' });
+      else {
+        add({ id: 'spedge', group: G, kind: 'work', code: 'KAM-008', name: 'Montáž ukončovací lišty na vnějším rohu špalet', unit: 'bm', qty: r2(o.edge), ok: true });
+        add({ id: 'o_spedge', group: G, kind: 'other', need: r2(o.edge * 1.05), needUnit: 'bm', name: 'Ukončovací lišta špalet (materiál)', unit: 'bm', qty: r2(o.edge * 1.05), ok: false, note: 'není v ceníku – doplňte cenu (+ 5 % odřezky)' });
+      }
+    }
+    if (P.winSill === 'obklad' && o.sillBm > 0) add({ id: 'sill', group: G, kind: 'work', code: 'MONT-009', name: 'Obložení parapetu obkladem', unit: 'bm', qty: r2(o.sillBm), ok: true, note: `plocha parapetů ${r2(o.sillA)} m² je započtena do plochy obkladu` });
+    if (P.winSill === 'miru' && o.wN > 0) {
+      const wl = Number(P.winW) || 0;
+      add({ id: 'sill', group: G, kind: 'work', code: wl <= 100 ? 'PRD-050' : wl <= 150 ? 'PRD-051' : 'PRD-052', name: 'Výroba okenního parapetu z dlažby na míru', unit: 'ks', qty: o.wN, ok: wl <= 220, note: `délka ${wl} cm${wl > 220 ? ' – nad 220 cm v ceníku není položka' : ''}` });
     }
   }
   const hyd = !!P.wet || (floor && !!P.hydroOn); // hydroizolace: koupelna, nebo samostatně (garáž, technická místnost s vpustí)
@@ -303,12 +342,13 @@ export function plan(P) {
   }
   // sokl z dlažby (jen podlaha): vše v bm, silikon i ve svislých rozích o výšce soklu
   const soklOn = floor && P.sokl;
-  const soklBm = soklOn ? (Number(P.soklBm) || perim) : 0;
+  const doorBm = soklOn ? Math.max(Number(P.doorN) || 0, 0) * (Number(P.doorW) || 0) / 100 : 0;
+  const soklBm = soklOn ? Math.max(r2((Number(P.soklBm) || perim) - doorBm), 0) : 0;
   const soklH = Number(P.soklH) || 8;
   const sIn = Number(P.soklIn) || 0, sOut = Number(P.soklOut) || 0;
   const silVert = soklOn ? sIn * soklH / 100 : 0;
   if (soklOn) {
-    add({ id: 'skl', group: 'Sokl', kind: 'work', code: 'KAM-011', name: `Montáž řezaného soklu z dlažby, výška ${soklH} cm`, unit: 'bm', qty: soklBm, ok: true, note: 'dlažbu na sokl započítejte do materiálu dlažby; horní spára se řeší silikonem níže' });
+    add({ id: 'skl', group: 'Sokl', kind: 'work', code: 'KAM-011', name: `Montáž řezaného soklu z dlažby, výška ${soklH} cm`, unit: 'bm', qty: soklBm, ok: true, note: 'dlažbu na sokl započítejte do materiálu dlažby; horní spára se řeší silikonem níže' + (doorBm > 0 ? `; obvod sníženo o dveře ${r2(doorBm)} bm` : '') });
     if (soklH <= 10) add({ id: 'skl2', group: 'Sokl', kind: 'work', code: 'KAM-022', name: 'Řezání pásů soklu z dlažby na míru', unit: 'bm', qty: soklBm, ok: true });
     if (sIn > 0) add({ id: 'skl_in', group: 'Sokl', kind: 'work', code: 'KAM-013', label: 'Vnitřní roh soklu – spoj na tupo', name: 'Vnitřní roh soklu – spoj na tupo', unit: 'ks', qty: sIn, ok: true });
     if (sOut > 0) add({ id: 'skl_out', group: 'Sokl', kind: 'work', code: 'KAM-014', label: 'Vnější roh soklu – kamenický roh Jolly 45°', name: 'Vnější roh soklu – kamenický roh Jolly 45°', unit: 'ks', qty: sOut, ok: true });

@@ -1,7 +1,7 @@
 // Průvodce skladby: po výběru položky „Pokládka dlažby / obkladu“ nabídne doplnění všech navazujících prací a materiálu.
 import { h, kc, parseNum, toast } from './util.js';
 import { S, priceFor, displayName, displayUnit } from './store.js';
-import { MAT, sponaRe, plan, defaults, parseFormat, triggerRe } from './skladba.js';
+import { MAT, sponaRe, plan, defaults, parseFormat, triggerRe, effArea, openings } from './skladba.js';
 
 export const guideApplies = (p) => (p.category === 'podlaha' || p.category === 'stena') && triggerRe.test(p.name || '');
 
@@ -81,6 +81,7 @@ export function openGuide({ item, row, onDone, initial }) {
   const redraw = () => {
     const rows = buildRows({ ...P, A: num(P.A), perim: num(P.perim) });
     listBox.replaceChildren();
+    if (mode !== 'podlaha' && num(P.A)) { const o = openings(P); const ea = effArea({ ...P, A: num(P.A) }); if (Math.abs(ea - num(P.A)) > 0.005) listBox.append(h('div', { class: 'muted', style: { fontSize: '13px' } }, `Plocha obkladu po úpravě: ${Math.round(ea * 100) / 100} m² (zadáno ${num(P.A)} − otvory ${Math.round(o.deduct * 100) / 100} + špalety ${Math.round(o.areaSp * 100) / 100} + parapety ${Math.round(o.sillA * 100) / 100})`)); }
     if (!num(P.A)) { listBox.append(h('p', { class: 'muted' }, 'Zadejte plochu (m²) – návrh se spočítá.')); totalEl.textContent = ''; lastRows = []; return; }
     let lastG = '', sum = 0;
     for (const o of rows) {
@@ -165,6 +166,8 @@ export function openGuide({ item, row, onDone, initial }) {
         mode === 'podlaha' ? chk('sokl', 'Sokl z dlažby (silikon, fabionek, rohy)') : null,
         mode === 'podlaha' ? num_('soklH', 'Výška soklu (cm)') : null,
         mode === 'podlaha' ? num_('soklBm', 'Obvod soklu (bm, prázdné = obvod místnosti)') : null,
+        mode === 'podlaha' ? num_('doorN', 'Dveře – otvory v soklu (ks)') : null,
+        mode === 'podlaha' ? num_('doorW', 'Dveře – šířka otvoru (cm)') : null,
         mode === 'podlaha' ? num_('soklIn', 'Vnitřní rohy soklu (ks)') : null,
         mode === 'podlaha' ? num_('soklOut', 'Vnější rohy soklu (ks)') : null,
         mode === 'podlaha' ? chk('butter', 'Oboustranné lepení (buttering-floating)') : null,
@@ -178,7 +181,13 @@ export function openGuide({ item, row, onDone, initial }) {
         num_('levA', 'Plocha vyrovnání (m², prázdné = celá)'), h('span'), h('span'),
         chk('niche', 'Nika ve stěně'), num_('nicheN', 'Niky (ks)'), chk('nicheLed', 'Zapuštěné osvětlení v nice'),
         num_('nicheW', 'Nika – šířka (cm)'), num_('nicheH', 'Nika – výška (cm)'), num_('nicheD', 'Nika – hloubka (cm)'),
-        sel('nicheEdge', 'Okraj niky', [['lista', 'ukončovací lišta po obvodu'], ['jolly', 'kamenické rohy (Jolly)'], ['none', 'bez']])) : null,
+        sel('nicheEdge', 'Okraj niky', [['lista', 'ukončovací lišta po obvodu'], ['jolly', 'kamenické rohy (Jolly)'], ['none', 'bez']]),
+        chk('openDeduct', 'Zadaná plocha je hrubá – odečíst dveře a okna'), h('span'), h('span'),
+        num_('doorN', 'Dveře (ks)'), num_('doorW', 'Dveře – šířka (cm)'), num_('doorH', 'Dveře – výška (cm)'),
+        chk('doorSp', 'Obkládat špalety dveří'), chk('doorTop', 'včetně horní špalety'), num_('doorDepth', 'Dveře – hloubka špalety (cm)'),
+        num_('winN', 'Okna (ks)'), num_('winW', 'Okno – šířka (cm)'), num_('winH', 'Okno – výška (cm)'),
+        chk('winSp', 'Obkládat špalety oken'), chk('winTop', 'včetně horní špalety'), num_('winDepth', 'Okno – hloubka špalety (cm)'),
+        sel('winSill', 'Parapet okna', [['none', 'bez parapetu'], ['obklad', 'obkládaný obkladem'], ['miru', 'vyrobený na míru z dlažby']]), sel('spEdge', 'Vnější roh špalet (do místnosti)', [['lista', 'ukončovací lišta'], ['jolly', 'kamenický roh (Jolly)']]), h('span')) : null,
       h('div', { class: 'grid c3', style: { marginTop: '8px' } },
         sel('grout', 'Spárování', [['cement', 'cementová – Ultracolor Plus'], ['epoxid', 'epoxidová – Kerapoxy Easy Design']]),
         sel('groutColor', 'Odstín spáry', colors.length ? colors.map(([c, n]) => [c, `${c} ${n}`]) : [['113', '113']]),
@@ -197,7 +206,7 @@ export function openGuide({ item, row, onDone, initial }) {
             if (r.premium) { delete r.premium; prem.push(r); } else base.push(r);
           }
           if (!base.length && !prem.length) return toast('Nic k přidání', 'err');
-          onDone({ base, prem, area: num(P.A), state: { P: { ...P }, off: [...off], ovr: { ...ovr } }, fmt: [num(P.fa), num(P.fb)] });
+          onDone({ base, prem, area: Math.round(effArea({ ...P, A: num(P.A) }) * 100) / 100, state: { P: { ...P }, off: [...off], ovr: { ...ovr } }, fmt: [num(P.fa), num(P.fb)] });
           dlg.remove();
           toast(`Přidáno ${base.length} řádků${prem.length ? ' + ' + prem.length + ' do PREMIUM' : ''}`);
         } }, initial ? 'Uložit změny skladby' : 'Přidat do nabídky'))));
