@@ -60,7 +60,7 @@ export function defaults(p, mode) {
   return {
     mode, A: 10, fa: f[0], fb: f[1], thick: Math.max(...f) >= 120 ? 6 : 9, joint: big ? 2 : 3, perim: 0,
     uneven: false, nivT: 3, nivCrack: false, nivCrackBm: '', nivGrind: false, penLayers: 1, penType: 'beton',
-    sep: mode === 'podlaha' && big ? 'mapetex' : 'none', adhesive: 'auto', silType: 'ac', spony: big, butter: mode === 'podlaha' && big, bedT: mode === 'podlaha' ? 4 : 3, hydro: mode === 'podlaha' ? 'wps' : 'wp200', hyReinf: 'net', wpAdh: '1k', prostText: '2×32', cornerBm: 0,
+    sep: mode === 'podlaha' && big ? 'mapetex' : 'none', adhesive: 'auto', silType: 'ac', spony: big, kriz: !big, butter: mode === 'podlaha' && big, bedT: mode === 'podlaha' ? 4 : 3, hydro: mode === 'podlaha' ? 'wps' : 'wp200', hyReinf: 'net', wpAdh: '1k', prostText: '2×32', cornerBm: 0,
     grout: 'cement', groutColor: '113', epoxPremium: true, sil: true, dilBm: 0, stripBm: 0, dilatPasek: mode === 'podlaha',
     drainType: 'zed', wet: false, showerL: 90, showerW: '', wallBm: '', wetH: 2, slope: true, corIn: 4, corOut: 0, prost: 2, drain: 'none', drainLen: 0.8, slopeA: 0, slopeT: 4, test: true,
     reserve: 5,
@@ -278,7 +278,7 @@ export function plan(P) {
     add({ id: 'm_spona', group: 'Lepení', kind: 'mat', matRe: 'spona', joint: P.joint, need: clips, needUnit: 'ks', name: 'MAPEI Mapelevel PROWDG spony', ok: true, note: `TL Mapelevel PROWDG (tabulka na 10 m²: 60×60 = 105 ks, 120×60 = 77, 120×120 = 49, 200×200 = 28) → ${r2(clips / A)} ks/m² pro tento formát` });
     add({ id: 'm_klin', group: 'Lepení', kind: 'mat', mat: 'klin', need: clips, needUnit: 'ks', name: MAT.klin.label, ok: true, note: 'TL: tabulka uvádí počty klínků/spon společně – 1 klínek na 1 sponu' });
   }
-  add({ id: 'o_kriz', group: 'Lepení', kind: 'other', need: Math.ceil(A * 2 / (a * b / 1e6)), needUnit: 'ks', name: `Vymezovací křížky ${P.joint} mm`, unit: 'ks', qty: Math.ceil(A * 2 / (a * b / 1e6)), ok: false, note: '⚠ MAPEI počty neuvádí – odhad 2 ks na křížení spár; nejsou v ceníku, doplňte cenu' });
+  if (P.kriz !== false) add({ id: 'o_kriz', group: 'Lepení', kind: 'other', need: Math.ceil(A * 2 / (a * b / 1e6)), needUnit: 'ks', name: `Vymezovací křížky ${P.joint} mm`, unit: 'ks', qty: Math.ceil(A * 2 / (a * b / 1e6)), ok: false, note: '⚠ MAPEI počty neuvádí – odhad 2 ks na křížení spár; nejsou v ceníku, doplňte cenu' });
   if (P.butter) add({ id: 'butter', group: 'Lepení', kind: 'work', code: 'MONT-010', name: 'Příplatek za oboustranné lepení (buttering-floating)', unit: 'm²', qty: A, ok: true });
   const mx = Math.max(Number(P.fa) || 0, Number(P.fb) || 0);
   const ad = !P.adhesive || P.adhesive === 'auto' ? (mx <= 60 ? 'maxi' : mx <= 120 ? 'ul1' : 'ul2') : P.adhesive;
