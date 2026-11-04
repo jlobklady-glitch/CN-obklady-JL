@@ -116,16 +116,26 @@ export function openGuide({ item, row, onDone }) {
   const wetBox = h('div', { class: 'grid c2', style: { marginTop: '6px' } });
   const drawWet = () => {
     wetBox.replaceChildren();
-    if (!P.wet) return;
+    if (!P.wet && !(mode === 'podlaha' && P.hydroOn)) return;
     if (mode !== 'podlaha') {
       wetBox.append(num_('wallBm', 'Délka mokrých stěn (bm, prázdné = celá plocha obkladu)'), num_('wetH', 'Výška hydroizolace stěn (m, min. 2)'),
         sel('hydro', 'Hydroizolace', [['wp200', 'folie Mapeguard WP 200'], ['smart', 'cementová Mapegum WPS + pásky do rohů']]), sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]),
         num_('cornerBm', 'Svislé kouty (bm)'), num_('corIn', 'Vnitřních rohů – tvarovky (ks)'), num_('corOut', 'Vnějších rohů – tvarovky (ks)'), txt_('prostText', 'Prostupy vody: ks × průměr mm (např. 2×32, 1×110)'), chk('test', 'Zkouška těsnosti (zatopení)'));
       return;
     }
-    wetBox.append(num_('showerL', 'Sprcha – rozměr A (cm, min. 80)'), num_('showerW', 'Sprcha – rozměr B (cm, prázdné = stejný)'), num_('wallBm', 'Délka stěn s hydroizolací (bm, prázdné = L+W)'), num_('wetH', 'Výška hydroizolace stěn (m, min. 2)'), chk('slope', 'Spádování sprchy (potěr + dlažba do spádu)'), num_('slopeT', 'Spádový potěr – průměrná tl. (cm)'),
-      sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'sprchový žlab'], ['vpust', 'bodová vpusť']]), sel('drainType', 'Typ žlabu', [['zed', 'u zdi'], ['roh', 'v rohu'], ['prostor', 'volně v prostoru'], ['vzed', 'integrovaný ve zdi']]), num_('drainLen', 'Délka žlabu (bm)'),
-      sel('hydro', 'Hydroizolace', [['wp200', 'folie Mapeguard WP 200 (podlaha i stěny)'], ['smart', 'cementová Mapelastic Smart (podlaha) + Mapegum WPS (stěny)']]), sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]), sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]), num_('corIn', 'Vnitřních rohů (ks)'), num_('corOut', 'Vnějších rohů (ks)'), txt_('prostText', 'Prostupy: ks × průměr mm (např. 2×32, 1×110)'), num_('cornerBm', 'Svislé kouty ve sprše (bm)'), chk('test', 'Zkouška těsnosti (zatopení)'));
+    const shower = !!P.wet;
+    wetBox.append(...[
+      shower ? num_('showerL', 'Sprcha – rozměr A (cm, min. 80)') : null, shower ? num_('showerW', 'Sprcha – rozměr B (cm, prázdné = stejný)') : null,
+      num_('wallBm', shower ? 'Délka stěn s hydroizolací (bm, prázdné = L+W)' : 'Hydroizolace stěn – délka (bm, prázdné = jen podlaha + pásek u stěn)'), num_('wetH', 'Výška hydroizolace stěn (m, min. 2)'),
+      shower ? chk('slope', 'Spádování sprchy (potěr + dlažba do spádu)') : null, shower ? num_('slopeT', 'Spádový potěr – průměrná tl. (cm)') : null,
+      sel('drain', 'Odtok', [['none', 'bez žlabu / vpusti'], ['zlab', 'liniový / sprchový žlab'], ['vpust', 'podlahová vpusť (gula) / bodový odtok']], () => drawWet()),
+      P.drain === 'zlab' ? sel('drainType', 'Typ žlabu', [['zed', 'u zdi'], ['roh', 'v rohu'], ['prostor', 'volně v prostoru'], ['vzed', 'integrovaný ve zdi']]) : null, P.drain === 'zlab' ? num_('drainLen', 'Délka žlabu (bm)') : null,
+      P.drain === 'vpust' ? num_('drainN', 'Počet vpustí (ks)') : null,
+      sel('hydro', 'Hydroizolace', [['wps', 'tekutá Mapegum WPS – plocha + pásky do koutů'], ['smart', 'cementová Mapelastic Smart (podlaha) + Mapegum WPS (stěny)'], ['wp200', 'PREMIUM: folie Mapeguard WP 200 (podlaha i stěny)']], () => drawWet()),
+      P.hydro === 'wp200' ? sel('wpAdh', 'Lepidlo na pásky a přesahy folie', [['1k', 'Mapeguard WP Adhesive 1K (4 kg)'], ['2k', 'Mapeguard WP Adhesive (2K, 6,65 kg)']]) : null,
+      P.hydro === 'smart' ? sel('hyReinf', 'Výztuž cementové hydroizolace', [['net', 'síťovina Mapenet 150'], ['sel', 'textilie Mapetex SEL N']]) : null,
+      num_('corIn', 'Vnitřních rohů – tvarovky (ks)'), num_('corOut', 'Vnějších rohů – tvarovky (ks)'), txt_('prostText', 'Prostupy: ks × průměr mm (např. 2×32, 1×110)'),
+      shower ? num_('cornerBm', 'Svislé kouty ve sprše (bm)') : null, chk('test', 'Zkouška těsnosti (zatopení)')].filter(Boolean));
   };
   drawWet();
   const dlg = h('div', { class: 'modal-back', style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' } },
@@ -137,6 +147,8 @@ export function openGuide({ item, row, onDone }) {
         num_('thick', 'Tloušťka dlaždice (mm)'), num_('joint', 'Šířka spáry (mm)'), num_('perim', 'Obvod (bm) – prázdné = odhad'),
         num_('bedT', 'Tloušťka lepicího lože (mm)'), num_('penLayers', 'Počet vrstev penetrace'), sel('penType', 'Podklad', [['beton', 'beton / cementový potěr – Primer G 1:2'], ['anhydrit', 'anhydrit – Primer G neředěný'], ['nesavy', 'nesavý (starý obklad) – Eco Prim Grip Plus']], () => { P.penLayers = P.penType === 'anhydrit' ? 2 : 1; const i = dlg.querySelector('[data-k="penLayers"]'); if (i) i.value = P.penLayers; })),
       h('div', { class: 'grid c2', style: { marginTop: '8px' } },
+        chk('vacOn', 'Vysátí povrchu (přípravný úklid)'),
+        mode === 'podlaha' ? chk('grind', 'Broušení podkladu (jen když je potřeba)') : null,
         mode === 'podlaha' ? chk('uneven', 'Podklad je nerovný – nivelační stěrka', () => { redraw(); }) : null,
         mode === 'podlaha' ? num_('nivT', 'Nivelace – tloušťka / výška lití (mm; do 10 = Ultraplan Eco 20, nad 10 = Ultraplan Maxi)') : null,
         mode === 'podlaha' ? chk('nivGrind', 'Před nivelací brousit / frézovat a vysát podklad (dle potřeby)') : null,
@@ -157,7 +169,7 @@ export function openGuide({ item, row, onDone }) {
         mode === 'podlaha' ? num_('stripBm', 'Spáry z podkladu k přenesení (bm)') : null,
         chk('sil', 'Silikon v koutech a dilatacích')),
       mode !== 'podlaha' ? h('div', { class: 'grid c3', style: { marginTop: '8px' } },
-        chk('scrape', 'Oškrabat podklad (kde to jde) + vysát'), num_('otvory', 'Otvory v obkladu (krabice, ks)'), h('span'),
+        chk('scrape', 'Oškrabat podklad (kde to jde)'), num_('otvory', 'Otvory v obkladu (krabice, ks)'), h('span'),
         chk('levOn', 'Vyrovnávky (penetrace před i po)'), sel('levType', 'Vyrovnání', [['lepidlo', 'stěrkovým lepidlem (do 5 mm)'], ['malta', 'maltou PCI K01 (více vyrovnávek)']]), num_('levT', 'Tloušťka vyrovnání (mm)'),
         num_('levA', 'Plocha vyrovnání (m², prázdné = celá)'), h('span'), h('span'),
         chk('niche', 'Nika ve stěně'), num_('nicheN', 'Niky (ks)'), chk('nicheLed', 'Zapuštěné osvětlení v nice'),
@@ -167,7 +179,7 @@ export function openGuide({ item, row, onDone }) {
         sel('grout', 'Spárování', [['cement', 'cementová – Ultracolor Plus'], ['epoxid', 'epoxidová – Kerapoxy Easy Design']]),
         sel('groutColor', 'Odstín spáry', colors.length ? colors.map(([c, n]) => [c, `${c} ${n}`]) : [['113', '113']]),
         h('div', null, chk('epoxPremium', 'Epoxid jako příplatek v PREMIUM'))),
-      h('div', { style: { marginTop: '8px' } }, chk('wet', mode === 'podlaha' ? 'Koupelna / sprchový kout (hydroizolace, spád)' : 'Mokrá zóna – hydroizolace stěn', () => { drawWet(); }), wetBox),
+      h('div', { style: { marginTop: '8px' } }, mode === 'podlaha' ? sel('floorHyd', 'Hydroizolace podlahy', [['none', 'bez hydroizolace'], ['koupelna', 'koupelna / sprchový kout (hydroizolace + spád)'], ['jina', 'jen hydroizolace (garáž, technická místnost, vpusť)']], () => { P.wet = P.floorHyd === 'koupelna'; P.hydroOn = P.floorHyd === 'jina'; drawWet(); }) : chk('wet', 'Mokrá zóna – hydroizolace stěn', () => { drawWet(); }), wetBox),
       h('h3', { style: { marginTop: '14px' } }, 'Návrh řádků do nabídky'),
       listBox,
       h('div', { style: { marginTop: '10px' } }, totalEl),
