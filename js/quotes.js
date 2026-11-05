@@ -7,6 +7,7 @@ import { itemsEditor } from './items.js';
 import { guideApplies, openGuide } from './pruvodce.js';
 import { parseFormat, triggerRe } from './skladba.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
+import { openEmailDialog } from './email.js';
 
 const stavCls = { 'Dokončena': 'ok', 'Zamítnuta': 'bad', 'Potvrzena': 'blue', 'V realizaci': 'blue', 'Nabídka zaslána': 'gold' };
 
@@ -120,6 +121,13 @@ export async function quoteEditor(root, id) {
         } }, 'Zákazník zvolil PREMIUM')));
   };
   drawPremium();
+  const stavSel = h('select', { onchange: bind('status') }, STAV.map((s) => h('option', { selected: s === q.status }, s)));
+  const sendEmail = () => openEmailDialog(q, {
+    beforeOpen: () => saver.flush(),
+    onSent: async () => {
+      if (q.status === 'Rozpracovaná') { q.status = 'Nabídka zaslána'; stavSel.value = q.status; touch(); await saver.flush(); }
+    },
+  });
   const preview = h('div');
   const showPreview = () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: quoteDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); };
 
@@ -131,13 +139,14 @@ export async function quoteEditor(root, id) {
       h('a', { href: '#/objednavka/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Objednávka'),
       h('a', { href: '#/vyuctovani/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Vyúčtování'),
       h('a', { href: '#/protokol/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Předávací protokol'),
+      h('button', { class: 'btn small', onclick: sendEmail }, 'Poslat e-mailem'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(quoteDoc(q)); } }, 'PDF / Tisk')),
     h('div', { class: 'card' }, h('div', { class: 'grid c4' },
       field('Číslo nabídky', h('input', { type: 'text', value: q.number, oninput: bind('number') })),
       field('Datum vystavení', h('input', { type: 'date', value: q.issued_on, oninput: bind('issued_on') })),
       field('Platnost (dní)', h('input', { type: 'number', value: q.valid_days, oninput: bind('valid_days', 'num') })),
-      field('Stav', h('select', { onchange: bind('status') }, STAV.map((s) => h('option', { selected: s === q.status }, s)))))),
+      field('Stav', stavSel))),
     h('div', { class: 'card' }, h('h2', null, 'Odběratel'), h('div', { class: 'grid c2' },
       field('Vybrat z kontaktů', pick, 'span2'), field('Jméno / firma', nameIn), field('Adresa', addrIn), field('Kontakt (tel., e-mail)', contIn),
       field('Stavba / místo realizace', h('input', { type: 'text', value: q.project, oninput: bind('project') })), idsInfo)),
