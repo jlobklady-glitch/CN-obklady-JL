@@ -2,10 +2,11 @@
 import { h, kc, fmtDate, toast, isoToday } from './util.js';
 import { STAV, listQuotes, listInvoices, saveQuote, quoteTotal } from './store.js';
 import { settlementTotals } from './doc.js';
+import { countNewInquiries } from './poptavky.js';
 
 export async function prehledView(root) {
   root.replaceChildren(h('p', { class: 'muted' }, 'Načítám…'));
-  const [quotes, invoices] = await Promise.all([listQuotes(), listInvoices()]);
+  const [quotes, invoices, newInq] = await Promise.all([listQuotes(), listInvoices(), countNewInquiries().catch(() => null)]);
   const amount = (q) => (q.settlement && q.settlement.items ? settlementTotals(q).actual : quoteTotal(q.items || []));
   const by = (s) => quotes.filter((q) => q.status === s);
   const sum = (a) => a.reduce((t, q) => t + amount(q), 0);
@@ -28,6 +29,7 @@ export async function prehledView(root) {
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Přehled')),
     h('div', { class: 'grid tiles', style: { marginBottom: '14px' } },
+      newInq === null ? null : tile('Nové poptávky z webu', String(newInq), newInq ? 'čekají na vyřízení' : 'nic nového', '#/poptavky'),
       tile('Čeká na odpověď', String(by('Nabídka zaslána').length), kc(sum(by('Nabídka zaslána'))), '#/nabidky'),
       tile('Potvrzené / v realizaci', String(active.length), kc(sum(active)), '#/nabidky'),
       tile('Nezaplacené faktury', String(unpaid.length), kc(unpaidSum) + (overdue.length ? ` · po splatnosti: ${overdue.length}` : ''), '#/nabidky'),

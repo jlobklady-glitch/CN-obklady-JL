@@ -13,6 +13,7 @@ import { skladView } from './sklad.js';
 import { hodinyView } from './hodiny.js';
 import { zbyloView } from './zbylo.js';
 import { contactsView, pricesView, settingsView } from './views.js';
+import { inquiriesView, inquiriesBanner } from './poptavky.js';
 
 window.__ver = APP_VERSION;
 const app = document.getElementById('app');
@@ -63,7 +64,7 @@ function profilePicker(then) {
       h('p', { class: 'muted' }, 'Profil mění jen údaje dodavatele v záhlaví nabídek a faktur. Data jsou společná. Profil lze kdykoli změnit v menu.'))));
 }
 
-const TABS = [['#/prehled', 'Přehled'], ['#/nabidky', 'Nabídky'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
+const TABS = [['#/prehled', 'Přehled'], ['#/poptavky', 'Poptávky'], ['#/nabidky', 'Nabídky'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 function stackAll(el) {
   el.querySelectorAll('table.t').forEach((t) => {
@@ -104,7 +105,7 @@ async function route() {
   const bkBanner = (days === null || days >= 7) && !S.offline ? h('div', { class: 'banner' }, h('span', null, days === null ? 'Data ještě nebyla zálohována. ' : `Poslední záloha byla před ${days} dny. `),
     h('button', { class: 'btn small gold', onclick: async (e) => { e.target.disabled = true; try { const r = await backupToDrive(); toast('Záloha uložena na Disk: ' + r.name); bkBanner.remove(); } catch (er) { toast(er.message, 'err'); e.target.disabled = false; } } }, 'Zálohovat teď')) : null;
   app.replaceChildren(h('div', { class: 'shell' }, bar, scrim, drawer, bkBanner, S.offline ? h('div', { class: 'banner' }, 'Offline – zobrazena poslední načtená data, ukládání nebude fungovat.') : null, main));
-  if (!S.offline) { dueBanner(main); priceBanner(main); }
+  if (!S.offline) { dueBanner(main); priceBanner(main); inquiriesBanner(main); }
   stackObs?.disconnect(); stackObs = new MutationObserver(() => stackAll(main)); stackObs.observe(main, { childList: true, subtree: true });
   try {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
@@ -112,6 +113,7 @@ async function route() {
     else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/objednavka/')) await orderView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/protokol/')) await handoverView(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/poptavky')) await inquiriesView(main);
     else if (hash.startsWith('#/zisk')) await ziskView(main);
     else if (hash.startsWith('#/sklad')) await skladView(main);
     else if (hash.startsWith('#/hodiny')) await hodinyView(main);
