@@ -56,9 +56,9 @@ section{padding:clamp(60px,9vw,110px) 0;border-top:1px solid var(--joint)}
 /* galerie – místa pro skutečné fotografie */
 .gal{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:44px}
 .ph{position:relative;min-height:220px;background:linear-gradient(135deg,#2b2c30,#1c1d20);border:1px solid var(--joint);display:flex;align-items:flex-end;padding:14px;color:var(--mut);font-size:14px}
-.ph:nth-child(1){grid-column:span 7;min-height:380px}.ph:nth-child(2){grid-column:span 5}
-.ph:nth-child(3){grid-column:span 4}.ph:nth-child(4){grid-column:span 4}.ph:nth-child(5){grid-column:span 4}
-@media(max-width:760px){.ph:nth-child(n){grid-column:span 12;min-height:200px}}
+.gal .ph:nth-child(1){grid-column:span 7;min-height:380px}.gal .ph:nth-child(2){grid-column:span 5}
+.gal .ph:nth-child(3){grid-column:span 4}.gal .ph:nth-child(4){grid-column:span 4}.gal .ph:nth-child(5){grid-column:span 4}
+@media(max-width:760px){.gal .ph:nth-child(n){grid-column:span 12;min-height:200px}}
 
 /* Jolly */
 .jolly{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}
@@ -87,6 +87,15 @@ textarea{min-height:120px}
 .small{font-size:14px;color:var(--mut)}
 footer{border-top:1px solid var(--joint);padding:34px 0;color:var(--mut);font-size:15px}
 footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+/* partneři – světlý pás, loga jsou navržená na bílé */
+.partners{background:#fff;color:var(--ink);border-top:0}
+.partners h2{color:var(--ink)}
+.partners .lead{color:#5a5650}
+.partners .strip{overflow-x:auto;margin-top:36px;-webkit-overflow-scrolling:touch}
+.partners img{display:block;width:100%;min-width:760px;height:auto}
+.social{display:flex;gap:10px 22px;flex-wrap:wrap;margin-top:22px}
+.social a{color:var(--stone);text-decoration:none;border-bottom:1px solid var(--brass);padding-bottom:2px}
+.social a:hover{color:#fff}
 .call{position:fixed;right:14px;bottom:14px;z-index:6}
 @media(min-width:761px){.call{display:none}}
 @media(prefers-reduced-motion:reduce){.floor i{animation:none;opacity:1}html{scroll-behavior:auto}}
@@ -161,6 +170,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
  </ol>
 </div></section>
 
+<section class="partners" id="partneri"><div class="wrap">
+ <h2>Materiály a partneři</h2>
+ <p class="lead">Pracujeme s prověřenou stavební chemií a nářadím a spolupracujeme s firmami, na které se můžeme spolehnout.</p>
+ <div class="strip"><img src="assets/partners.jpg" width="1200" height="186" loading="lazy" alt="Dodavatelé stavební chemie: Mapei, KABE Farben, Tenax, Murexin. Nářadí: Shijing, Bosch, Proxxon, DiStar. Partneři: Galand CZ, Konzum, Stavby DZ."></div>
+</div></section>
+
 <section><div class="wrap two">
  <div>
   <h2>O nás</h2>
@@ -174,6 +189,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <h2>Nezávazná poptávka</h2>
   <p class="lead">Napište, co potřebujete. Ozveme se do dvou pracovních dnů.</p>
   <p class="lead">Telefon: <a href="tel:+420725967231">+420 725 967 231</a><br>E-mail: <a href="mailto:jlobklady@gmail.com">jlobklady@gmail.com</a><br>Lázeňská 59, 561 12 Brandýs nad Orlicí</p>
+  <p class="social"><a href="https://www.instagram.com/jl_obklady" target="_blank" rel="noopener">Instagram @jl_obklady</a><a href="https://youtube.com/@jl_obklady" target="_blank" rel="noopener">YouTube JL-OBKLADY</a></p>
  </div>
  <form onsubmit="event.preventDefault();this.querySelector('button').textContent='Ukázka formuláře – odeslání zatím nefunguje'">
   <div class="g2"><label>Jméno<input required autocomplete="name"></label><label>Telefon<input required type="tel" autocomplete="tel"></label></div>
