@@ -37,6 +37,9 @@ export async function enablePush() {
     { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, label: String(navigator.userAgent).slice(0, 120) },
     { onConflict: 'endpoint' });
   if (error) throw error;
+  // ověření, že se zařízení opravdu uložilo na server
+  const { data: chk, error: e2 } = await sb.from('push_subscriptions').select('id').eq('endpoint', j.endpoint).maybeSingle();
+  if (e2 || !chk) throw new Error('Zařízení se nepodařilo uložit na server.' + (e2 ? ' ' + e2.message : ''));
 }
 
 export async function disablePush() {
@@ -79,7 +82,12 @@ export function pushCard() {
       btns.append(
         h('button', { class: 'btn small', onclick: run(async () => {
           const r = await sendTestPush();
-          if (!r.sent) throw new Error('Zkušební upozornění se nepodařilo odeslat (odesláno: ' + r.sent + ', chyb: ' + r.failed + ').');
+          if (r.error) throw new Error(r.error);
+          if (!r.sent) {
+            const d = (r.details || []).map((x) => (x.host || '?') + ' ' + (x.status || '') + ' ' + (x.message || '')).join('; ');
+            if (!r.total) throw new Error('Na serveru není uloženo žádné zařízení. Vypněte upozornění a zapněte je znovu.');
+            throw new Error('Zkušební upozornění se nepodařilo doručit. ' + (r.removed ? 'Zařízení bylo odhlášeno (' + r.removed + '), zapněte upozornění znovu. ' : '') + d);
+          }
         }, 'Zkušební upozornění odesláno') }, 'Poslat zkušební upozornění'),
         h('button', { class: 'btn small ghost', onclick: run(disablePush, 'Upozornění vypnuta') }, 'Vypnout na tomto zařízení'));
     } else {
