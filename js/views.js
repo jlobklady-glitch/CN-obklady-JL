@@ -3,6 +3,7 @@ import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
 import { importButtons } from './cenikimport.js';
+import { pushCard } from './push.js';
 import { renameWorkerRecords, patchPrice, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
@@ -179,6 +180,7 @@ export function settingsView(root) {
         if (pw.value.length < 8) return toast('Heslo musí mít alespoň 8 znaků', 'err');
         const { error } = await sb.auth.updateUser({ password: pw.value });
         if (error) toast(error.message, 'err'); else { pw.value = ''; toast('Heslo změněno'); } } }, 'Změnit heslo'))),
+    pushCard(),
     h('div', { class: 'card' }, h('h2', null, 'Záloha dat'),
       h('p', { class: 'muted' }, 'Uloží všechno (nabídky, vyúčtování, faktury, kontakty, ceníky, sklad, hodiny) do jednoho souboru. V telefonu zvolte „Uložit na Disk“, na počítači se soubor stáhne. Doporučeno aspoň jednou týdně.'),
       h('div', { class: 'row' },
