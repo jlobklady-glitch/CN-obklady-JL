@@ -267,7 +267,7 @@ export function plan(P) {
     const flr = floor ? A : 0;
     if (wpA > 0) {
       add({ id: 'wp', group: 'Hydroizolace', kind: 'work', code: 'HYDR-004', name: 'Vlepení hydroizolační folie Mapeguard WP 200', unit: 'm²', qty: wpA, ok: true });
-      add({ id: 'm_wp', group: 'Hydroizolace', kind: 'mat', mat: 'wp200', need: wpA * 1.1, needUnit: 'm²', name: MAT.wp200.label, ok: true, note: `TL: role 1 × 30 m / 5 m, přesahy min. 5 cm; ${r2(wpA)} m² (podlaha + stěny) + 10 % přesahy a odpad` });
+      add({ id: 'm_wp', group: 'Hydroizolace', kind: 'mat', mat: 'wp200', need: P.zoneWalls ? (wpA - w) * 1.1 + w : wpA * 1.1, needUnit: 'm²', name: MAT.wp200.label, ok: true, note: P.zoneWalls ? `TL: role 1 × 30 m / 5 m; podlaha ${r2(wpA - w)} m² + 10 % na přířez; stěny sprchy a vany ${r2(w)} m² z pásů 1 × 2 m (přesahy jsou už v celých pásech, bez přídavku)` : `TL: role 1 × 30 m / 5 m, přesahy min. 5 cm; ${r2(wpA)} m² (podlaha + stěny) + 10 % přesahy a odpad` });
       add({ id: 'm_wpl', group: 'Hydroizolace', kind: 'mat', mat: 'ultralite1', need: wpA * 0.8 * 2 * (1 + rs / 100), needUnit: 'kg', name: MAT.ultralite1.label + ' – na vlepení folie', ok: false, note: 'TL Mapeguard WP 200 uvádí Ultralite S1 jako příklad lepidla C2; ⚠ lože 2 mm je předpoklad' });
     } else if (flr > 0 && wps) {
       // tekutá Mapegum WPS na podlaze: do koutů páska, výztužná síťovina se nepoužívá

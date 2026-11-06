@@ -83,7 +83,7 @@ export function draftFromRooms(rooms) {
         const zw = zoneWalls(r);
         P.wetH = 2;
         if (r.walls && r.wallLen > 0 && r.waterproof) P.wallBm = 0.001; // hydroizolaci stěn počítá obklad stěn, ať se nepočítá dvakrát
-        else if (zw.bm > 0) P.wallBm = zw.bm; else P.wallBm = 0.001;
+        else if (zw.bm > 0) { P.wallBm = zw.bm; P.zoneWalls = true; } else P.wallBm = 0.001;
         if (r.shower) { P.slope = true; P.showerL = r.showerL || 90; P.showerW = r.showerW || r.showerL || 90; P.drain = 'zlab'; } else { P.slope = false; P.drain = 'none'; }
         const sec = { title: `${lab} – podlaha`, inputs: `podlaha ${cz(r.L)} × ${cz(r.W)} m = ${cz(P.A)} m², obvod ${cz(P.perim)} m; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.reserve} %; nivelace ${r.level ? 'ano' : 'ne'}; hydroizolace podlahy ${P.wet ? 'ano, celá plocha ' + cz(P.A) + ' m²' : 'ne'}; sprcha ${r.shower ? P.showerL + '×' + P.showerW + ' cm se žlabem' : 'ne'}; vana ${r.bath ? r.bathL + '×' + r.bathW + ' cm' : 'ne'}; sokl ${r.sokl ? 'ano' : 'ne'}`, lines: [] };
         sections.push(sec); take(P, sec); demoA += P.A;
@@ -97,7 +97,7 @@ export function draftFromRooms(rooms) {
         const zw = zoneWalls(r);
         P.test = false;
         if (r.waterproof && r.hydroWalls === 'cele') { P.wet = true; P.wallBm = r.wallLen; P.wetH = Math.max(r.wallH, 2); }
-        else if (r.waterproof && zw.bm > 0) { P.wet = true; P.wallBm = zw.bm; P.wetH = 2; }
+        else if (r.waterproof && zw.bm > 0) { P.wet = true; P.wallBm = zw.bm; P.wetH = 2; P.zoneWalls = true; }
         else { P.wet = false; }
         const sec = { title: `${lab} – stěny`, inputs: `obklad stěn: obvod ${cz(r.wallLen)} m × výška ${cz(r.wallH)} m = ${cz(P.A)} m²; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.reserve} %; hydroizolace stěn ${P.wet ? (r.hydroWalls === 'cele' ? 'všechny obkládané stěny, výška ' + cz(P.wetH) + ' m' : 'zóny ' + zw.parts.map((x) => x[0] + ' = ' + cz(x[1]) + ' m').join('; ') + '; výška 2 m') : 'ne'}`, lines: [] };
         sections.push(sec); take(P, sec); demoA += P.A;
