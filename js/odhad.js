@@ -49,11 +49,15 @@ export function draftFromRooms(rooms) {
     const cur = acc.get(key);
     if (cur) cur.qty = q2(cur.qty + Number(row.qty)); else acc.set(key, { ...row, qty: q2(row.qty), disc: 0 });
   };
-  const take = (P) => {
+  const sections = [];
+  const take = (P, sec) => {
     for (const o of buildRows(P)) {
       if (!o.row || (o.l.kind !== 'work' && o.l.kind !== 'mat')) continue;
-      if (o.miss || o.row.price === '' || !(Number(o.row.qty) > 0)) { missing++; if (o.miss) notes.push(o.miss); continue; }
-      addRow(listPriceRow(o.row));
+      const row = listPriceRow(o.row);
+      const bad = !!o.miss || row.price === '' || !(Number(row.qty) > 0);
+      sec.lines.push({ group: o.l.group, kind: o.l.kind, name: row.name || o.l.name, need: o.l.need ?? o.l.qty, needUnit: o.l.needUnit || o.l.unit, note: o.l.note || '', est: o.l.ok === false, packs: o.packs || '', row: bad ? null : row, miss: o.miss || '' });
+      if (bad) { missing++; if (o.miss) notes.push(o.miss); continue; }
+      addRow(row);
     }
   };
   rooms = rooms || [];
@@ -66,8 +70,10 @@ export function draftFromRooms(rooms) {
         const P = defaults(item, 'podlaha');
         P.A = q2(r.L * r.W); P.perim = Math.round(2 * (r.L + r.W) * 10) / 10;
         P.uneven = !!r.level; P.wet = !!r.waterproof || !!r.shower; P.test = false; P.sokl = !!r.sokl;
+        if (r.walls && r.wallLen > 0) P.wallBm = 0.001; // hydroizolaci stěn (i sprchy) počítá obklad stěn, ať se nepočítá dvakrát
         if (r.shower) { P.slope = true; P.showerL = r.showerL || 90; P.showerW = r.showerW || r.showerL || 90; P.drain = 'zlab'; } else { P.slope = false; P.drain = 'none'; }
-        take(P); demoA += P.A;
+        const sec = { title: `${lab} – podlaha`, inputs: `podlaha ${cz(r.L)} × ${cz(r.W)} m = ${cz(P.A)} m², obvod ${cz(P.perim)} m; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.rs} %; nivelace ${r.level ? 'ano' : 'ne'}; hydroizolace ${P.wet ? 'ano' : 'ne'}; sprcha ${r.shower ? P.showerL + '×' + P.showerW + ' cm se žlabem' : 'ne'}; sokl ${r.sokl ? 'ano' : 'ne'}`, lines: [] };
+        sections.push(sec); take(P, sec); demoA += P.A;
       } else notes.push(`${lab}: v ceníku chybí položka pokládky dlažby`);
     }
     if (r.walls && r.wallLen > 0 && r.wallH > 0) {
@@ -76,12 +82,17 @@ export function draftFromRooms(rooms) {
         const P = defaults(item, 'stena');
         P.A = q2(r.wallLen * r.wallH);
         P.wet = !!r.waterproof; P.test = false; P.wallBm = r.wallLen; P.wetH = r.wallH;
-        take(P); demoA += P.A;
+        const sec = { title: `${lab} – stěny`, inputs: `obklad stěn: obvod ${cz(r.wallLen)} m × výška ${cz(r.wallH)} m = ${cz(P.A)} m²; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.rs} %; hydroizolace ${P.wet ? 'ano, do výšky ' + cz(Math.max(r.wallH, 2)) + ' m' : 'ne'}`, lines: [] };
+        sections.push(sec); take(P, sec); demoA += P.A;
       } else notes.push(`${lab}: v ceníku chybí položka pokládky obkladu`);
     }
     if (r.remove && demoA > 0) {
       const dem = workByCode('DEM-006');
-      if (dem) addRow({ typ: 'prace', item_id: dem.id, name: dem.name, unit: dem.unit, qty: demoA, price: Number(dem.price) || 0 });
+      if (dem) {
+        const row = { typ: 'prace', item_id: dem.id, name: dem.name, unit: dem.unit, qty: demoA, price: Number(dem.price) || 0 };
+        addRow(row);
+        sections.push({ title: `${lab} – demontáž`, inputs: `odstranění starého obkladu a dlažby: podlaha + stěny = ${cz(demoA)} m²`, lines: [{ group: 'Demontáž', kind: 'work', name: dem.name, need: demoA, needUnit: dem.unit, note: 'plocha podlahy + obkládaných stěn', est: false, packs: '', row, miss: '' }] });
+      }
       else notes.push('V ceníku chybí DEM-006 (demontáž obkladů)');
     }
     if (r.underfloor) notes.push(`${lab}: podlahové topení – v balíčku orientační měření vlhkosti podkladu`);
@@ -89,7 +100,7 @@ export function draftFromRooms(rooms) {
   });
   const items = [...acc.values()];
   items.sort((a, b) => (a.typ === 'prace' ? 0 : 1) - (b.typ === 'prace' ? 0 : 1));
-  return { items, missing, notes: [...new Set(notes)] };
+  return { items, missing, notes: [...new Set(notes)], sections };
 }
 
 const NOTE = 'Orientační cena práce a materiálu (lepidla, penetrace, hydroizolace, spárovací hmoty apod.) vypočtená z rozměrů, které jste zadali. Materiál je naceněn podle ceníkových cen výrobce. Cena samotného obkladu a dlažby zahrnuta není. Přesný položkový rozpočet s vybraným materiálem a zaměření na místě jsou součástí balíčku (viz poslední strana).';

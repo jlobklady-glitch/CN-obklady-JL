@@ -3,6 +3,7 @@
 import { h, toast, confirmBox, fmtDate } from './util.js';
 import { sb, newQuote, saveQuote } from './store.js';
 import { createDraftQuote } from './odhad.js';
+import { openCalcView } from './vypocet.js';
 import { openPaymentDialog, PAYMENT_FEE } from './email.js';
 import { inquiryVs } from './pay.js';
 
@@ -133,6 +134,7 @@ export async function inquiriesView(root) {
       r.status === 'k_odsouhlaseni' && quotesBy[r.id] ? h('p', { class: 'banner', style: { margin: '6px 0' } }, 'Orientační nabídka je připravená k odsouhlasení. Zkontrolujte ji, upravte a odešlete.') : null,
       r.status === 'balicek' ? h('p', { class: 'banner', style: { margin: '6px 0' } }, 'Zákazník objednal balíček. Pošlete mu platební údaje.') : null,
       roomsBox(r),
+      Array.isArray(r.rooms) && r.rooms.length ? h('button', { class: 'btn small ghost', onclick: () => { try { openCalcView(r); } catch (er) { toast('Výpočet se nepodařilo zobrazit: ' + er.message, 'err'); } } }, 'Výpočet (interně)') : null,
       r.description ? h('p', { style: { whiteSpace: 'pre-wrap', margin: '6px 0' } }, r.description) : null,
       photosRow(r),
       h('div', { class: 'row', style: { marginTop: '8px' } }, sel,
