@@ -1,3 +1,4 @@
+import './backclose.js';
 import { h, toast, kc, isoToday, addDays } from './util.js';
 import { backupToDrive } from './backup.js';
 import { sb, S, loadAll, profileList, setProfile, listInvoices } from './store.js';
