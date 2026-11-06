@@ -4,7 +4,7 @@ import { S, firmaFor, quoteTotal } from './store.js';
 import { quoteDoc } from './doc.js';
 import { htmlToPdf, pdfName } from './pdf.js';
 import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.js';
-import { czIban, spayd, qrGif, inquiryVs } from './pay.js';
+import { czIban, spayd, qrGif, inquiryVs, PACKAGE_FEE, packageUrl } from './pay.js';
 
 const GOLD = '#b8975a', NAVY = '#22303C';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -39,6 +39,7 @@ export function defaultMessage(q, f) {
     '',
     `Nabídka je platná do ${validTo}. Cena je orientační, konečná cena vychází z finálního vyúčtování skutečně provedených prací.`,
     '',
+    ...(q.show_package ? [`Cena je orientační a počítá jen práci. Pokud chcete přesný položkový rozpočet včetně materiálu, zaměření na místě a rezervaci termínu, můžete si objednat balíček za ${kc(PACKAGE_FEE)}. Celá jeho cena se na konci zakázky odečte z ceny. Podrobnosti jsou na poslední straně nabídky.`, ''] : []),
     'V případě jakýchkoli dotazů nebo úprav nás neváhejte kontaktovat, rádi vše probereme i osobně.',
     '',
     'S pozdravem',
@@ -48,7 +49,8 @@ export function defaultMessage(q, f) {
 // Prostý text pro klienty, které HTML nezobrazují
 export function buildText(q, f, message) {
   const sig = [f.name, f.phone && 'tel. ' + f.phone, f.email, f.web, ...socials(f).filter(([n]) => n !== 'Web').map(([n, u]) => `${n}: ${u}`)].filter(Boolean);
-  return `${message}\n\n${sig.join('\n')}\n`;
+  const u = q.show_package ? packageUrl(q.package_token) : '';
+  return `${message}\n\n${u ? 'Objednat balíček: ' + u + '\n\n' : ''}${sig.join('\n')}\n`;
 }
 
 const paraHtml = (message) => String(message).split(/\n{2,}/).map((p) =>
@@ -95,13 +97,15 @@ export function buildHtml(q, f, message) {
     total > 0 ? rowHtml('Orientační cena', kc(total)) : '',
     rowHtml('Platnost do', validTo),
   ].join('');
+  const url = q.show_package ? packageUrl(q.package_token) : '';
+  const cta = url ? `<tr><td style="padding:0 32px 24px" align="center"><a href="${esc(url)}" style="display:inline-block;background:${GOLD};color:#17181a;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:3px">Objednat balíček za ${esc(kc(PACKAGE_FEE))}</a><div style="font-size:12px;color:#6b7580;padding-top:8px">Rozpočet s materiálem, zaměření a rezervace termínu. Cena se odečte z konečné ceny.</div></td></tr>` : '';
   return frame(f, `<tr><td style="padding:30px 32px 6px">${paraHtml(message)}</td></tr>` +
     box(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${summary}</table>
-  <div style="font-size:12px;color:#6b7580;padding-top:10px">Podrobný rozpis prací a materiálů najdete v přiložené nabídce (PDF).</div>`));
+  <div style="font-size:12px;color:#6b7580;padding-top:10px">Rozpis cenové nabídky najdete v přiložené nabídce (PDF).</div>`) + cta);
 }
 
 // ---- platební údaje k objednané nabídce (QR platba) ----
-export const PAYMENT_FEE = 4000;
+export const PAYMENT_FEE = PACKAGE_FEE;
 
 export function paymentMessage(r, f) {
   return [

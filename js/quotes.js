@@ -1,6 +1,6 @@
 // Nabídky: seznam a editor.
 import { h, kc, fmtDate, matcher, toast, confirmBox, makeSaver, parseNum, num, isoToday } from './util.js';
-import { S, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
+import { S, sb, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
 import { itemsEditor } from './items.js';
@@ -121,11 +121,15 @@ export async function quoteEditor(root, id) {
         } }, 'Zákazník zvolil PREMIUM')));
   };
   drawPremium();
+  const pkgCard = h('div', { class: 'card' }, h('label', { class: 'row' },
+    h('input', { type: 'checkbox', checked: !!q.show_package, style: { width: 'auto' }, onchange: (e) => { q.show_package = e.target.checked; touch(); } }),
+    h('b', null, 'Přidat stránku „Balíček: rozpočet a zaměření“ (placený balíček za 4 000 Kč, odkaz na objednání)')));
   const stavSel = h('select', { onchange: bind('status') }, STAV.map((s) => h('option', { selected: s === q.status }, s)));
   const sendEmail = () => openEmailDialog(q, {
     beforeOpen: () => saver.flush(),
     onSent: async () => {
       if (q.status === 'Rozpracovaná') { q.status = 'Nabídka zaslána'; stavSel.value = q.status; touch(); await saver.flush(); }
+      if (q.inquiry_id) { try { await sb.from('inquiries').update({ status: 'nabidka', updated_at: new Date().toISOString() }).eq('id', q.inquiry_id).in('status', ['nova', 'k_odsouhlaseni', 'kontaktovan']); } catch (_) { /* nepodstatné */ } }
     },
   });
   const preview = h('div');
@@ -156,6 +160,7 @@ export async function quoteEditor(root, id) {
         h('span', { class: 'muted' }, 'Cenu i text můžete kdykoli přepsat ručně.')),
       h('div', { class: 'totalbar' }, h('div', { class: 'l' }, 'CELKEM K ÚHRADĚ'), totalV)),
     premiumCard,
+    pkgCard,
     h('div', { class: 'card' }, h('div', { class: 'grid c2' },
       field('Poznámka k nabídce', h('textarea', { oninput: bind('note') }, q.note || ''), 'span2'),
       field('Stav platby', h('select', { onchange: bind('payment_status') }, PLATBA.map((s) => h('option', { selected: s === q.payment_status }, s)))))),

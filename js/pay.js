@@ -41,3 +41,8 @@ export function inquiryVs(r) {
   const n = parseInt(String(r.id || '').replace(/[^0-9a-f]/gi, '').slice(0, 8) || '0', 16) % 10000;
   return ymd + String(n).padStart(4, '0');
 }
+
+// Placený balíček (položkový rozpočet s materiálem, zaměření, rezervace termínu)
+export const PACKAGE_FEE = 4000;
+export const WEB_BASE = 'https://jl-obklady-web.jlobklady.workers.dev';
+export const packageUrl = (token) => (token ? `${WEB_BASE}/balicek.html?t=${token}` : '');

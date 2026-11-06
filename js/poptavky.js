@@ -2,13 +2,15 @@
 // Data zapisuje Edge Function "poptavka"; aplikace je čte jen po přihlášení (pravidla RLS).
 import { h, toast, confirmBox, fmtDate } from './util.js';
 import { sb, newQuote, saveQuote } from './store.js';
+import { createDraftQuote } from './odhad.js';
 import { openPaymentDialog, PAYMENT_FEE } from './email.js';
 import { inquiryVs } from './pay.js';
 
-export const INQ_STATUS = [['nova', 'Nová'], ['kontaktovan', 'Kontaktován'], ['ceka_platba', 'Čeká na platbu'], ['zaplaceno', 'Zaplaceno'], ['nabidka', 'Nabídka'], ['uzavreno', 'Vyřízeno'], ['zamitnuto', 'Zamítnuto']];
+export const INQ_STATUS = [['nova', 'Nová'], ['k_odsouhlaseni', 'K odsouhlasení'], ['kontaktovan', 'Kontaktován'], ['nabidka', 'Nabídka odeslána'], ['balicek', 'Objednán balíček'], ['ceka_platba', 'Čeká na platbu'], ['zaplaceno', 'Zaplaceno'], ['uzavreno', 'Vyřízeno'], ['zamitnuto', 'Zamítnuto']];
 const statusLabel = (k) => (INQ_STATUS.find(([x]) => x === k) || [k, k])[1];
-const BADGE = { nova: 'gold', kontaktovan: 'blue', ceka_platba: 'gold', zaplaceno: 'ok', nabidka: 'blue', uzavreno: 'ok', zamitnuto: 'bad' };
-const FILTERS = [['aktivni', 'Aktivní', ['nova', 'kontaktovan', 'ceka_platba', 'zaplaceno', 'nabidka']], ['nova', 'Nové', ['nova']], ['vyrizene', 'Vyřízené a zamítnuté', ['uzavreno', 'zamitnuto']], ['vse', 'Vše', null]];
+const BADGE = { nova: 'gold', k_odsouhlaseni: 'gold', kontaktovan: 'blue', balicek: 'gold', ceka_platba: 'gold', zaplaceno: 'ok', nabidka: 'blue', uzavreno: 'ok', zamitnuto: 'bad' };
+const ACTIVE = ['nova', 'k_odsouhlaseni', 'kontaktovan', 'nabidka', 'balicek', 'ceka_platba', 'zaplaceno'];
+const FILTERS = [['pozor', 'Čeká na mě', ['nova', 'k_odsouhlaseni', 'balicek']], ['aktivni', 'Aktivní', ACTIVE], ['vyrizene', 'Vyřízené a zamítnuté', ['uzavreno', 'zamitnuto']], ['vse', 'Vše', null]];
 
 const BUCKET = 'inquiry-photos';
 
@@ -25,9 +27,25 @@ async function fetchInquiries() {
 }
 
 export async function countNewInquiries() {
-  const { count, error } = await sb.from('inquiries').select('id', { count: 'exact', head: true }).eq('status', 'nova');
+  const { count, error } = await sb.from('inquiries').select('id', { count: 'exact', head: true }).in('status', ['nova', 'k_odsouhlaseni', 'balicek']);
   if (error) throw error;
   return count || 0;
+}
+
+// Nové poptávky s rozměry: vytvoří se návrh orientační nabídky. Poptávku „zabere“ jen jedno zařízení
+// (podmíněná změna stavu), takže při otevření na dvou telefonech nevzniknou dvě nabídky.
+export async function autoDrafts() {
+  const { data, error } = await sb.from('inquiries').select('*').eq('status', 'nova').order('created_at', { ascending: true }).limit(20);
+  if (error || !data) return 0;
+  let made = 0;
+  for (const r of data) {
+    if (!Array.isArray(r.rooms) || !r.rooms.length) continue;
+    const { data: got } = await sb.from('inquiries').update({ status: 'k_odsouhlaseni', updated_at: new Date().toISOString() }).eq('id', r.id).eq('status', 'nova').select('id');
+    if (!got || !got.length) continue;
+    try { await createDraftQuote(r); made++; }
+    catch (e) { await sb.from('inquiries').update({ status: 'nova' }).eq('id', r.id); console.error('návrh nabídky selhal', e); }
+  }
+  return made;
 }
 
 async function patchInquiry(id, patch) {
@@ -37,6 +55,11 @@ async function patchInquiry(id, patch) {
 
 // Z poptávky vznikne nová nabídka s vyplněným odběratelem a stavbou.
 async function createQuoteFrom(r) {
+  if (Array.isArray(r.rooms) && r.rooms.length) {
+    const { q } = await createDraftQuote(r);
+    await patchInquiry(r.id, { status: 'k_odsouhlaseni' });
+    return q;
+  }
   const q = await newQuote();
   q.customer_name = r.name;
   q.customer_contact = [r.phone, r.email].filter(Boolean).join(', ');
@@ -47,6 +70,19 @@ async function createQuoteFrom(r) {
   const note = [r.note, `Nabídka ${q.number}`].filter(Boolean).join('\n');
   await patchInquiry(r.id, { status: 'nabidka', note });
   return q;
+}
+
+const TL = { koupelna: 'Koupelna', wc: 'WC', kuchyn: 'Kuchyň', chodba: 'Chodba', jine: 'Místnost' };
+const FL = { '30x60': 'do 30×60', '60x60': '60×60', '60x120': '60×120', '120x120': '120×120', '120x280': 'velkoformát', nevim: 'formát neznámý' };
+// Přehled místností a prací, které zákazník zadal na webu
+function roomsBox(r) {
+  const rooms = Array.isArray(r.rooms) ? r.rooms : [];
+  if (!rooms.length) return null;
+  const f = (x) => String(Math.round(x * 100) / 100).replace('.', ',');
+  return h('div', { style: { margin: '6px 0' } }, ...rooms.map((x) => h('div', { style: { fontSize: '14px', margin: '2px 0' } },
+    h('b', null, (x.name || TL[x.type] || 'Místnost') + ': '),
+    [x.floor ? `podlaha ${f(x.L)}×${f(x.W)} m (${f(x.L * x.W)} m²)` : '', x.walls ? `obklad stěn ${f(x.wallLen)} m × ${f(x.wallH)} m` : '', FL[x.format] || '',
+      x.shower ? `sprcha ${x.showerL}×${x.showerW} cm` : '', x.waterproof ? 'hydroizolace' : '', x.level ? 'nivelace' : '', x.remove ? 'demontáž starého' : '', x.sokl ? 'sokl' : '', x.underfloor ? 'podlahové topení' : ''].filter(Boolean).join(', '))));
 }
 
 function photosRow(r) {
@@ -73,8 +109,11 @@ function photosRow(r) {
 export async function inquiriesView(root) {
   root.replaceChildren(h('p', { class: 'muted' }, 'Načítám…'));
   let rows;
+  try { await autoDrafts(); } catch (_) { /* návrh se zkusí při dalším otevření */ }
+  const quotesBy = {};
+  try { const { data: qs } = await sb.from('quotes').select('id,number,inquiry_id').not('inquiry_id', 'is', null); (qs || []).forEach((x) => { quotesBy[x.inquiry_id] = x; }); } catch (_) { /* nic */ }
   try { rows = await fetchInquiries(); } catch (e) { root.replaceChildren(h('p', { class: 'muted' }, 'Poptávky se nepodařilo načíst: ' + e.message)); return; }
-  let filter = rows.some((r) => r.status === 'nova') ? 'nova' : 'aktivni';
+  let filter = rows.some((r) => ['nova', 'k_odsouhlaseni', 'balicek'].includes(r.status)) ? 'pozor' : 'aktivni';
   const list = h('div');
 
   const card = (r) => {
@@ -91,17 +130,22 @@ export async function inquiriesView(root) {
       h('div', { class: 'muted' }, [fmtDateTime(r.created_at), r.work_type, r.location, r.timing ? 'termín: ' + r.timing : ''].filter(Boolean).join(' · ')),
       h('div', { class: 'row', style: { margin: '8px 0', gap: '14px' } },
         h('a', { href: 'tel:' + tel }, r.phone), r.email ? h('a', { href: 'mailto:' + r.email }, r.email) : null),
+      r.status === 'k_odsouhlaseni' && quotesBy[r.id] ? h('p', { class: 'banner', style: { margin: '6px 0' } }, 'Orientační nabídka je připravená k odsouhlasení. Zkontrolujte ji, upravte a odešlete.') : null,
+      r.status === 'balicek' ? h('p', { class: 'banner', style: { margin: '6px 0' } }, 'Zákazník objednal balíček. Pošlete mu platební údaje.') : null,
+      roomsBox(r),
       r.description ? h('p', { style: { whiteSpace: 'pre-wrap', margin: '6px 0' } }, r.description) : null,
       photosRow(r),
       h('div', { class: 'row', style: { marginTop: '8px' } }, sel,
         h('button', { class: 'btn small', onclick: () => openPaymentDialog(r, { onSent: async () => {
-          if (r.status === 'nova' || r.status === 'kontaktovan') { await patchInquiry(r.id, { status: 'ceka_platba' }); r.status = 'ceka_platba'; sel.value = r.status; badge.className = 'badge ' + BADGE[r.status]; badge.textContent = statusLabel(r.status); }
+          if (!['ceka_platba', 'zaplaceno', 'uzavreno', 'zamitnuto'].includes(r.status)) { await patchInquiry(r.id, { status: 'ceka_platba' }); r.status = 'ceka_platba'; sel.value = r.status; badge.className = 'badge ' + BADGE[r.status]; badge.textContent = statusLabel(r.status); }
         } }) }, 'Platební údaje'),
-        h('button', { class: 'btn small gold', onclick: async (e) => {
-          if (!(await confirmBox('Vytvořit z této poptávky novou nabídku?'))) return;
-          e.target.disabled = true;
-          try { const q = await createQuoteFrom(r); location.hash = '#/nabidka/' + q.id; } catch (er) { toast('Nabídku se nepodařilo vytvořit: ' + er.message, 'err'); e.target.disabled = false; }
-        } }, 'Vytvořit nabídku'),
+        quotesBy[r.id]
+          ? h('a', { class: 'btn small gold', href: '#/nabidka/' + quotesBy[r.id].id, style: { textDecoration: 'none' } }, 'Otevřít nabídku ' + quotesBy[r.id].number)
+          : h('button', { class: 'btn small gold', onclick: async (e) => {
+            if (!(await confirmBox('Vytvořit z této poptávky novou nabídku?'))) return;
+            e.target.disabled = true;
+            try { const q = await createQuoteFrom(r); location.hash = '#/nabidka/' + q.id; } catch (er) { toast('Nabídku se nepodařilo vytvořit: ' + er.message, 'err'); e.target.disabled = false; }
+          } }, 'Vytvořit nabídku'),
         h('button', { class: 'btn small danger', onclick: async () => {
           if (!(await confirmBox('Smazat poptávku včetně fotografií? Nelze vrátit zpět.'))) return;
           try {
@@ -132,10 +176,11 @@ export async function inquiriesView(root) {
 export async function inquiriesBanner(main) {
   try {
     if ((location.hash || '').startsWith('#/poptavky')) return;
+    await autoDrafts().catch(() => 0); // z nových poptávek s rozměry připraví návrh nabídky
     const n = await countNewInquiries();
     if (!n) return;
     const el = h('div', { class: 'banner' },
-      h('span', null, `Nové poptávky z webu: ${n}. `),
+      h('span', null, `Poptávky z webu, které čekají na vás: ${n}. `),
       h('a', { class: 'btn small gold', href: '#/poptavky', style: { textDecoration: 'none' } }, 'Zobrazit'),
       h('button', { class: 'btn small ghost', onclick: () => el.remove() }, '×'));
     main.parentNode.insertBefore(el, main);

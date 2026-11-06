@@ -4,7 +4,7 @@ import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA, firmaFor } from './sto
 
 // Dodavatel aktuálně vykreslovaného dokladu (podle toho, kdo doklad vystavil)
 let F = S.firma;
-import { czIban, spayd, qrSvg } from './pay.js';
+import { czIban, spayd, qrSvg, PACKAGE_FEE, packageUrl } from './pay.js';
 
 export function quoteDoc(q) {
   F = firmaFor(q);
@@ -52,6 +52,7 @@ export function quoteDoc(q) {
     <img class="strip" src="assets/strip-cn.jpg" alt="">
     <div class="foot">${esc(f.name)} · ${esc(f.phone)} · ${esc(f.email)}</div></div>
     ${q.premium ? premiumPage(q, total) : ''}
+    ${q.show_package ? packagePage(q) : ''}
   </div>`;
   return html;
 }
@@ -149,6 +150,27 @@ export function invoiceDoc(inv) {
         ${inv.paid ? '<div style="color:var(--ok);font-weight:800;margin-top:2mm">ZAPLACENO</div>' : ''}</div>
       <div style="width:34mm;height:34mm">${qr}</div></div>
     <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci. Před odesláním platby zkontrolujte v bance číslo účtu, částku a variabilní symbol.</div>${footer()}</div></div>`;
+}
+
+function packagePage(q) {
+  const url = packageUrl(q.package_token);
+  const li = (b, t) => `<div class="keep" style="margin-top:3mm;padding-left:7mm;position:relative"><span style="position:absolute;left:0;top:0;font-weight:800;color:#b8975a">&#10003;</span><div style="font-weight:800;font-size:10.5pt">${b}</div><div style="font-size:9.5pt;margin-top:.6mm">${t}</div></div>`;
+  return `<div class="pagebreak"></div>
+    <div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">BALÍČEK: ROZPOČET A ZAMĚŘENÍ</div></div><div class="stripe"></div>
+    <div style="font-weight:800;font-size:13pt;margin:4mm 0 2mm">Přesná cena a jistota termínu</div>
+    <div style="font-size:9.5pt;color:#374151">Cena v této nabídce je orientační a počítá jen práci. Chcete-li přesnou cenu včetně materiálu a pevný termín zahájení, objednejte si náš balíček. <b>Celá jeho cena se vám na konci zakázky odečte z konečné ceny.</b></div>
+    <div class="total" style="margin-top:4mm"><div class="l">CENA BALÍČKU</div><div class="v">${kc(PACKAGE_FEE)}</div></div>
+    <div class="lab" style="margin-top:5mm">Co v balíčku získáte</div>
+    ${li('Rezervace termínu', 'Termín zahájení domluvíme podle vaší stavby a její připravenosti. Po zaplacení ho držíme pro vás.')}
+    ${li('Položkový rozpočet včetně materiálu', 'Rozpis všech prací i materiálů s cenami, takže předem přesně víte, za co platíte.')}
+    ${li('Zaměření a schůzka přímo na místě', 'Probereme rozložení obkladů a dlažby, návaznosti, rohy, niky i sprchový kout a navrhneme řešení.')}
+    ${li('Orientační měření vlhkosti podkladu', 'U podlahového topení po provedené nátopové zkoušce zkontrolujeme, zda je podklad připravený na pokládku.')}
+    <div class="keep" style="margin-top:7mm;display:flex;gap:8mm;align-items:center">
+      ${url ? `<div style="width:30mm;height:30mm;flex:none">${qrSvg(url)}</div>` : ''}
+      <div style="font-size:9.5pt"><div style="font-weight:800;font-size:10.5pt">Jak balíček objednat</div>
+        ${url ? `Naskenujte QR kód nebo otevřete odkaz a potvrďte objednávku. Pošleme vám platební údaje s QR kódem.<div style="margin-top:1.5mm;word-break:break-all;font-size:8.5pt;color:#555">${esc(url)}</div>` : 'Stačí nám zavolat nebo napsat. Pošleme vám platební údaje s QR kódem.'}
+        <div style="margin-top:1.5mm">${esc(F.phone)}${F.email ? ' · ' + esc(F.email) : ''}</div></div></div>
+    ${footer()}`;
 }
 
 function premiumPage(q, base) {
