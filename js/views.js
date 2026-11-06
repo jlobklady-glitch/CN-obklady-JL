@@ -133,7 +133,7 @@ export function settingsView(root) {
   const pinp = (k) => h('input', { type: 'text', value: P[k] ?? '', oninput: (e) => { P[k] = e.target.value; } });
   const inp = (k, type = 'text') => h('input', { type, value: f[k] ?? '', oninput: (e) => { f[k] = type === 'number' ? parseNum(e.target.value) : e.target.value; } });
   const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
-  f.workers = f.workers && f.workers.length ? f.workers : ['Lukáš', 'Honza', 'Firma (JL-OBKLADY)'];
+  f.workers = f.workers && f.workers.length ? f.workers : ['Lukáš', 'Honza'];
   f.rates = f.rates || {};
   f.qa = f.qa && f.qa.length ? f.qa : JSON.parse(JSON.stringify(DEFAULT_QA));
   while (f.qa.length < 10) f.qa.push({ q: '', a: '', show: false });

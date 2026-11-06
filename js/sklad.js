@@ -3,7 +3,7 @@ import { h, kc, num, money, isoToday } from './util.js';
 import { S, loadRecords, priceFor, displayName } from './store.js';
 import { recordsList } from './records.js';
 
-export const PAYERS = () => (S.firma.workers && S.firma.workers.length ? S.firma.workers : ['Lukáš', 'Honza', 'Firma (JL-OBKLADY)']);
+export const PAYERS = () => (S.firma.workers && S.firma.workers.length ? S.firma.workers : ['Lukáš', 'Honza']);
 const n = (v) => Number(v) || 0;
 
 // Metoda FIFO: spotřeba se odečítá od nejstarších nákupů daného produktu.
