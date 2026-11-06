@@ -161,7 +161,7 @@ export function settingsView(root) {
     h('div', { class: 'card' }, h('h2', null, 'Dodavatel – profil: ' + (P.label || S.profile)), h('div', { class: 'grid c2' },
       fld('Jméno / název', pinp('name')), fld('IČO', pinp('ico')), fld('Adresa', pinp('address'), 'span2'),
       fld('Telefon', pinp('phone')), fld('E-mail', pinp('email')), fld('Číslo účtu', pinp('account')), fld('Banka', pinp('bank')),
-      fld('Instagram (odkaz)', inp('instagram')), fld('YouTube (odkaz)', inp('youtube')), fld('Slogan v záhlaví', inp('tagline'), 'span2'),
+      fld('Instagram (odkaz)', inp('instagram')), fld('YouTube (odkaz)', inp('youtube')), fld('Facebook (odkaz)', inp('facebook')), fld('Slogan v záhlaví', inp('tagline'), 'span2'),
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
       fld('Sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
       fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; } }, f.terms || ''), 'span2')),

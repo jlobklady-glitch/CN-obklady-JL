@@ -48,7 +48,7 @@ export function quoteDoc(q) {
     <div class="small">Cena je orientační. Dodavatel není plátcem DPH, cena je tedy konečná a žádná další daň se k ní nepřipočítává.</div>
     <div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(q.note)}</div>
     <div class="terms">${esc(f.terms)}</div>
-    <div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div>
+    <div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL_OBKLADY</div>
     <img class="strip" src="assets/strip-cn.jpg" alt="">
     <div class="foot">${esc(f.name)} · ${esc(f.phone)} · ${esc(f.email)}</div></div>
     ${q.premium ? premiumPage(q, total) : ''}
@@ -79,7 +79,7 @@ function partiesHtml(q) {
     <div class="cus"><div class="lab">Odběratel</div>${cus.map(([l, v]) => `<div class="r"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`;
 }
 const headBar = (title) => `<div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">${title}</div></div><div class="tag">${esc(F.tagline)}</div><div class="stripe"></div>`;
-const footer = () => `<div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL-OBKLADY</div><img class="strip" src="assets/strip-vy.jpg" alt=""><div class="foot">${esc(F.name)} · ${esc(F.phone)} · ${esc(F.email)}</div>`;
+const footer = () => `<div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL_OBKLADY</div><img class="strip" src="assets/strip-vy.jpg" alt=""><div class="foot">${esc(F.name)} · ${esc(F.phone)} · ${esc(F.email)}</div>`;
 
 export function settlementTotals(q) {
   const st = q.settlement || {};

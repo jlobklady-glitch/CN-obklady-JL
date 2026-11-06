@@ -8,13 +8,19 @@ import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.j
 const GOLD = '#b8975a', NAVY = '#22303C';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
-// odkazy na sítě: z nastavení firmy, jinak výchozí (stejné jako na webu)
+// odkazy na sítě: výchozí jsou skutečné odkazy firmy; z nastavení se použije jen úplný odkaz (https://…)
+const SOCIAL_DEFAULT = {
+  instagram: 'https://www.instagram.com/jl_obklady',
+  youtube: 'https://youtube.com/@jl_obklady',
+  facebook: 'https://www.facebook.com/share/1KxSvnfTCf/',
+};
+const fullUrl = (v, d) => { const t = String(v || '').trim(); return /^https:\/\/[^\s"<>]+$/i.test(t) ? t : d; };
 function socials(f) {
-  const ig = (f.instagram || 'jl_obklady').replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
-  const yt = (f.youtube || '@jl_obklady');
-  const ytUrl = /^https?:/i.test(yt) ? yt : 'https://youtube.com/' + (yt.startsWith('@') ? yt : '@' + yt);
-  const out = [['Instagram', 'https://www.instagram.com/' + ig], ['YouTube', ytUrl]];
-  if (f.facebook) out.push(['Facebook', /^https?:/i.test(f.facebook) ? f.facebook : 'https://facebook.com/' + f.facebook]);
+  const out = [
+    ['Instagram', fullUrl(f.instagram, SOCIAL_DEFAULT.instagram)],
+    ['YouTube', fullUrl(f.youtube, SOCIAL_DEFAULT.youtube)],
+    ['Facebook', fullUrl(f.facebook, SOCIAL_DEFAULT.facebook)],
+  ];
   if (f.web) out.push(['Web', /^https?:/i.test(f.web) ? f.web : 'https://' + f.web]);
   return out;
 }

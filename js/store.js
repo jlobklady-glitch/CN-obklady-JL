@@ -22,7 +22,7 @@ export const PLATBA = ['Nezaplaceno', 'Záloha uhrazena', 'Zaplaceno'];
 
 export const DEFAULT_FIRMA = {
   name: '', ico: '', address: '', email: '', phone: '', web: '', account: '', bank: '',
-  instagram: '', youtube: '', valid_days: 30, due_days: 14, terms: '',
+  instagram: '', youtube: '', facebook: '', valid_days: 30, due_days: 14, terms: '',
   mapei_discount: 0.28, kabe_markup: 0,
   tagline: 'OBKLADY  ·  DLAŽBY  ·  KOUPELNY  ·  DEKORATIVNÍ STĚRKY',
 };
