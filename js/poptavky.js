@@ -83,7 +83,7 @@ function roomsBox(r) {
   return h('div', { style: { margin: '6px 0' } }, ...rooms.map((x) => h('div', { style: { fontSize: '14px', margin: '2px 0' } },
     h('b', null, (x.name || TL[x.type] || 'Místnost') + ': '),
     [x.floor ? `podlaha ${f(x.L)}×${f(x.W)} m (${f(x.L * x.W)} m²)` : '', x.walls ? `obklad stěn ${f(x.wallLen)} m × ${f(x.wallH)} m` : '', FL[x.format] || '',
-      x.shower ? `sprcha ${x.showerL}×${x.showerW} cm` : '', x.waterproof ? 'hydroizolace' : '', x.level ? 'nivelace' : '', x.remove ? 'demontáž starého' : '', x.sokl ? 'sokl' : '', x.underfloor ? 'podlahové topení' : ''].filter(Boolean).join(', '))));
+      x.shower ? `sprcha ${x.showerL}×${x.showerW} cm` : '', x.bath ? `vana ${x.bathL}×${x.bathW} cm` : '', x.waterproof ? (x.hydroWalls === 'cele' ? 'hydroizolace (všechny stěny)' : 'hydroizolace (sprcha a vana)') : '', x.level ? 'nivelace' : '', x.remove ? 'demontáž starého' : '', x.sokl ? 'sokl' : '', x.underfloor ? 'podlahové topení' : ''].filter(Boolean).join(', '))));
 }
 
 function photosRow(r) {

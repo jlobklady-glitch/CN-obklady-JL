@@ -38,6 +38,15 @@ function listPriceRow(row) {
   const price = row.roll ? Math.round(Number(it.price) / row.roll * 100) / 100 : Math.round(Number(it.price) * 100) / 100;
   return { ...row, price };
 }
+// Zóny hydroizolace stěn: sprcha (2 stěny, na každou stranu přesah 50 cm) a vana (stěna za vanou a boční stěna,
+// délka zaokrouhlená nahoru na 0,5 m kvůli přesahům). Výška hydroizolace min. 2 m.
+const up05 = (cm) => Math.ceil(cm / 50 - 1e-9) * 0.5;
+function zoneWalls(r) {
+  const parts = [];
+  if (r.shower && r.showerL > 0) { parts.push([`sprcha – stěna ${r.showerL} cm + přesahy`, (r.showerL + 100) / 100], [`sprcha – stěna ${r.showerW || r.showerL} cm + přesahy`, ((r.showerW || r.showerL) + 100) / 100]); }
+  if (r.bath && r.bathL > 0) { parts.push([`vana – stěna za vanou ${r.bathL} cm → ${up05(r.bathL)} m`, up05(r.bathL)], [`vana – boční stěna ${r.bathW || 70} cm → ${up05(r.bathW || 70)} m`, up05(r.bathW || 70)]); }
+  return { parts, bm: Math.round(parts.reduce((a, x) => a + x[1], 0) * 100) / 100 };
+}
 const q2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
 // Vrací { items, missing, notes } – skutečné řádky nabídky s množstvím a jednotkou (nejdřív práce, potom materiál).
@@ -53,8 +62,9 @@ export function draftFromRooms(rooms) {
   const take = (P, sec) => {
     for (const o of buildRows(P)) {
       if (!o.row || (o.l.kind !== 'work' && o.l.kind !== 'mat')) continue;
+      if (Number(o.l.qty ?? o.l.need) < 0.05 && /^(m²|bm|kg)$/.test(o.l.unit || o.l.needUnit || '')) continue; // prakticky nulová množství se nezobrazují
       const row = listPriceRow(o.row);
-      const bad = !!o.miss || row.price === '' || !(Number(row.qty) > 0);
+      const bad = !!o.miss || row.price === '' || !(Number(row.qty) > 0) || (/^(m²|bm|kg)$/.test(row.unit || '') && Number(row.qty) < 0.05);
       sec.lines.push({ group: o.l.group, kind: o.l.kind, name: row.name || o.l.name, need: o.l.need ?? o.l.qty, needUnit: o.l.needUnit || o.l.unit, note: o.l.note || '', est: o.l.ok === false, packs: o.packs || '', row: bad ? null : row, miss: o.miss || '' });
       if (bad) { missing++; if (o.miss) notes.push(o.miss); continue; }
       addRow(row);
@@ -70,9 +80,12 @@ export function draftFromRooms(rooms) {
         const P = defaults(item, 'podlaha');
         P.A = q2(r.L * r.W); P.perim = Math.round(2 * (r.L + r.W) * 10) / 10;
         P.uneven = !!r.level; P.wet = !!r.waterproof || !!r.shower; P.test = false; P.sokl = !!r.sokl;
-        if (r.walls && r.wallLen > 0) P.wallBm = 0.001; // hydroizolaci stěn (i sprchy) počítá obklad stěn, ať se nepočítá dvakrát
+        const zw = zoneWalls(r);
+        P.wetH = 2;
+        if (r.walls && r.wallLen > 0 && r.waterproof) P.wallBm = 0.001; // hydroizolaci stěn počítá obklad stěn, ať se nepočítá dvakrát
+        else if (zw.bm > 0) P.wallBm = zw.bm; else P.wallBm = 0.001;
         if (r.shower) { P.slope = true; P.showerL = r.showerL || 90; P.showerW = r.showerW || r.showerL || 90; P.drain = 'zlab'; } else { P.slope = false; P.drain = 'none'; }
-        const sec = { title: `${lab} – podlaha`, inputs: `podlaha ${cz(r.L)} × ${cz(r.W)} m = ${cz(P.A)} m², obvod ${cz(P.perim)} m; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.rs} %; nivelace ${r.level ? 'ano' : 'ne'}; hydroizolace ${P.wet ? 'ano' : 'ne'}; sprcha ${r.shower ? P.showerL + '×' + P.showerW + ' cm se žlabem' : 'ne'}; sokl ${r.sokl ? 'ano' : 'ne'}`, lines: [] };
+        const sec = { title: `${lab} – podlaha`, inputs: `podlaha ${cz(r.L)} × ${cz(r.W)} m = ${cz(P.A)} m², obvod ${cz(P.perim)} m; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.reserve} %; nivelace ${r.level ? 'ano' : 'ne'}; hydroizolace podlahy ${P.wet ? 'ano, celá plocha ' + cz(P.A) + ' m²' : 'ne'}; sprcha ${r.shower ? P.showerL + '×' + P.showerW + ' cm se žlabem' : 'ne'}; vana ${r.bath ? r.bathL + '×' + r.bathW + ' cm' : 'ne'}; sokl ${r.sokl ? 'ano' : 'ne'}`, lines: [] };
         sections.push(sec); take(P, sec); demoA += P.A;
       } else notes.push(`${lab}: v ceníku chybí položka pokládky dlažby`);
     }
@@ -81,8 +94,12 @@ export function draftFromRooms(rooms) {
       if (item) {
         const P = defaults(item, 'stena');
         P.A = q2(r.wallLen * r.wallH);
-        P.wet = !!r.waterproof; P.test = false; P.wallBm = r.wallLen; P.wetH = r.wallH;
-        const sec = { title: `${lab} – stěny`, inputs: `obklad stěn: obvod ${cz(r.wallLen)} m × výška ${cz(r.wallH)} m = ${cz(P.A)} m²; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.rs} %; hydroizolace ${P.wet ? 'ano, do výšky ' + cz(Math.max(r.wallH, 2)) + ' m' : 'ne'}`, lines: [] };
+        const zw = zoneWalls(r);
+        P.test = false;
+        if (r.waterproof && r.hydroWalls === 'cele') { P.wet = true; P.wallBm = r.wallLen; P.wetH = Math.max(r.wallH, 2); }
+        else if (r.waterproof && zw.bm > 0) { P.wet = true; P.wallBm = zw.bm; P.wetH = 2; }
+        else { P.wet = false; }
+        const sec = { title: `${lab} – stěny`, inputs: `obklad stěn: obvod ${cz(r.wallLen)} m × výška ${cz(r.wallH)} m = ${cz(P.A)} m²; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.reserve} %; hydroizolace stěn ${P.wet ? (r.hydroWalls === 'cele' ? 'všechny obkládané stěny, výška ' + cz(P.wetH) + ' m' : 'zóny ' + zw.parts.map((x) => x[0] + ' = ' + cz(x[1]) + ' m').join('; ') + '; výška 2 m') : 'ne'}`, lines: [] };
         sections.push(sec); take(P, sec); demoA += P.A;
       } else notes.push(`${lab}: v ceníku chybí položka pokládky obkladu`);
     }
