@@ -44,6 +44,7 @@ export function quoteDoc(q) {
     <table class="dt"><thead><tr><th>#</th><th class="l">TYP</th><th class="l">POLOŽKA</th><th>MJ</th><th>MNOŽSTVÍ</th><th>CENA / MJ</th><th>SLEVA</th><th>CELKEM</th></tr></thead>
       <tbody>${rows}</tbody></table>
     <div class="keep">
+    ${subtotals(items)}
     <div class="total"><div class="l">CELKEM K ÚHRADĚ</div><div class="v">${kc(total)}</div></div>
     <div class="small">Cena je orientační. Dodavatel není plátcem DPH, cena je tedy konečná a žádná další daň se k ní nepřipočítává.</div>
     <div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(q.note)}</div>
@@ -152,13 +153,21 @@ export function invoiceDoc(inv) {
     <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci. Před odesláním platby zkontrolujte v bance číslo účtu, částku a variabilní symbol.</div>${footer()}</div></div>`;
 }
 
+// Mezisoučty práce a materiálu (jen když nabídka obsahuje obojí)
+function subtotals(items) {
+  const work = items.filter((r) => r.typ === 'prace'), mat = items.filter((r) => r.typ !== 'prace');
+  if (!work.length || !mat.length) return '';
+  const row = (l, v) => `<div style="display:flex;justify-content:space-between;font-size:10pt;padding:1mm 3mm;border-bottom:1px solid #ddd"><span>${l}</span><b>${kc(v)}</b></div>`;
+  return `<div style="margin:2mm 0">${row('Práce celkem', quoteTotal(work))}${row('Materiál celkem (orientační, dle ceníkových cen)', quoteTotal(mat))}</div>`;
+}
+
 function packagePage(q) {
   const url = packageUrl(q.package_token);
   const li = (b, t) => `<div class="keep" style="margin-top:3mm;padding-left:7mm;position:relative"><span style="position:absolute;left:0;top:0;font-weight:800;color:#b8975a">&#10003;</span><div style="font-weight:800;font-size:10.5pt">${b}</div><div style="font-size:9.5pt;margin-top:.6mm">${t}</div></div>`;
   return `<div class="pagebreak"></div>
     <div class="bar"><div class="t1">JL-OBKLADY</div><div class="t2">BALÍČEK: ROZPOČET A ZAMĚŘENÍ</div></div><div class="stripe"></div>
     <div style="font-weight:800;font-size:13pt;margin:4mm 0 2mm">Přesná cena a jistota termínu</div>
-    <div style="font-size:9.5pt;color:#374151">Cena v této nabídce je orientační a počítá jen práci. Chcete-li přesnou cenu včetně materiálu a pevný termín zahájení, objednejte si náš balíček. <b>Celá jeho cena se vám na konci zakázky odečte z konečné ceny.</b></div>
+    <div style="font-size:9.5pt;color:#374151">Cena v této nabídce je orientační: práce a materiál jsou spočítané z rozměrů, které jste zadali, bez samotného obkladu a dlažby. Chcete-li přesný rozpočet s vybraným materiálem a pevný termín zahájení, objednejte si náš balíček. <b>Celá jeho cena se vám na konci zakázky odečte z konečné ceny.</b></div>
     <div class="total" style="margin-top:4mm"><div class="l">CENA BALÍČKU</div><div class="v">${kc(PACKAGE_FEE)}</div></div>
     <div class="lab" style="margin-top:5mm">Co v balíčku získáte</div>
     ${li('Rezervace termínu', 'Termín zahájení domluvíme podle vaší stavby a její připravenosti. Po zaplacení ho držíme pro vás.')}

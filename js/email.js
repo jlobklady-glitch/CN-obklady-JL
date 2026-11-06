@@ -39,7 +39,7 @@ export function defaultMessage(q, f) {
     '',
     `Nabídka je platná do ${validTo}. Cena je orientační, konečná cena vychází z finálního vyúčtování skutečně provedených prací.`,
     '',
-    ...(q.show_package ? [`Cena je orientační a počítá jen práci. Pokud chcete přesný položkový rozpočet včetně materiálu, zaměření na místě a rezervaci termínu, můžete si objednat balíček za ${kc(PACKAGE_FEE)}. Celá jeho cena se na konci zakázky odečte z ceny. Podrobnosti jsou na poslední straně nabídky.`, ''] : []),
+    ...(q.show_package ? [`Cena je orientační (práce a základní materiál podle zadaných rozměrů, materiál dle ceníkových cen, bez obkladu a dlažby). Pokud chcete přesný položkový rozpočet s vybraným materiálem, zaměření na místě a rezervaci termínu, můžete si objednat balíček za ${kc(PACKAGE_FEE)}. Celá jeho cena se na konci zakázky odečte z ceny. Podrobnosti jsou na poslední straně nabídky.`, ''] : []),
     'V případě jakýchkoli dotazů nebo úprav nás neváhejte kontaktovat, rádi vše probereme i osobně.',
     '',
     'S pozdravem',
@@ -94,7 +94,11 @@ export function buildHtml(q, f, message) {
   const summary = [
     rowHtml('Číslo nabídky', q.number),
     q.project ? rowHtml('Akce', q.project) : '',
-    total > 0 ? rowHtml('Orientační cena', kc(total)) : '',
+    ...(() => {
+      const its = (q.items || []).filter((r) => r.name), w = quoteTotal(its.filter((r) => r.typ === 'prace')), m = quoteTotal(its.filter((r) => r.typ !== 'prace'));
+      return w > 0 && m > 0 ? [rowHtml('Práce', kc(w)), rowHtml('Materiál (dle ceníkových cen)', kc(m))] : [];
+    })(),
+    total > 0 ? rowHtml(q.show_package ? 'Orientační cena celkem' : 'Cena', kc(total)) : '',
     rowHtml('Platnost do', validTo),
   ].join('');
   const url = q.show_package ? packageUrl(q.package_token) : '';
