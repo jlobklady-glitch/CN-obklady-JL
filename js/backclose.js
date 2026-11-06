@@ -55,3 +55,20 @@ function watchDrawer() {
 }
 const mo = new MutationObserver(() => { if (watchDrawer()) mo.disconnect(); });
 if (!watchDrawer()) mo.observe(document.body, { childList: true, subtree: true });
+
+// PC: křížek v rohu okna (zobrazí ho jen CSS u zařízení s myší), klávesa Esc a u informačních oken i klik na pozadí.
+function addX(el) {
+  const box = el.firstElementChild;
+  if (!box || box.querySelector(':scope > .layer-x')) return;
+  if (getComputedStyle(box).position === 'static') box.style.position = 'relative';
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'layer-x'; x.textContent = '×'; x.title = 'Zavřít (Esc)'; x.setAttribute('aria-label', 'Zavřít');
+  x.addEventListener('click', (e) => { e.stopPropagation(); history.back(); });
+  box.prepend(x);
+}
+new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => { if (isLayer(n)) addX(n); }))).observe(document.body, { childList: true });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && stack.length && !e.defaultPrevented) { e.preventDefault(); history.back(); } });
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t && t.nodeType === 1 && t.hasAttribute('data-backdrop-close') && stack[stack.length - 1] === t) history.back();
+});

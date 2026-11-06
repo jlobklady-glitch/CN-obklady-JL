@@ -45,7 +45,7 @@ export function openCalcView(r) {
     const a = h('a', { href: URL.createObjectURL(new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' })), download: 'vypocet-' + String(r.name || 'poptavka').replace(/[^\w-]+/g, '_') + '.csv' });
     document.body.append(a); a.click(); a.remove();
   };
-  const overlay = h('div', { class: 'overlay', style: { alignItems: 'flex-start', overflowY: 'auto' } },
+  const overlay = h('div', { class: 'overlay', 'data-backdrop-close': '1', style: { alignItems: 'flex-start', overflowY: 'auto' } },
     h('div', { class: 'dialog', style: { maxWidth: '1100px', width: '96%', margin: '12px auto' } },
       h('h2', { style: { marginTop: 0 } }, 'Výpočet návrhu (interně)'),
       h('p', { class: 'muted' }, `${r.name}. ⚠ = odhad, který nevychází přímo z technického listu. Materiál je naceněn ceníkovou cenou. Cena obkladu a dlažby v součtu není.`),

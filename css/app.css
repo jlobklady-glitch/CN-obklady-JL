@@ -237,3 +237,7 @@ details.card summary{cursor:pointer;font-weight:700}
   .item [data-l]::before{content:attr(data-l);display:block;font-size:10px;font-weight:700;letter-spacing:.4px;color:var(--grey);text-transform:uppercase;margin-bottom:2px}
   .item .tot{padding-top:0;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end}
 }
+
+/* křížek pro zavření okna – jen zařízení s myší (PC) */
+.layer-x{display:none}
+@media (hover:hover) and (pointer:fine){.layer-x{display:block;position:absolute;top:6px;right:8px;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:#555;font-size:24px;line-height:28px;cursor:pointer;z-index:2}.layer-x:hover{background:#eee;color:#000}}
