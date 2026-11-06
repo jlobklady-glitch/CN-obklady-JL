@@ -60,9 +60,10 @@ const cleanAddr = (a) => String(a || '').replace(/[\r\n<>,;"]+/g, '').trim();
 const cleanFileName = (n) => String(n || 'priloha.pdf').replace(/[\r\n"\\/]+/g, ' ');
 
 // to: adresa příjemce, from: { name, email } (jen do hlavičky Reply-To), attachment: { name, bytes (Uint8Array), type }
-export function buildMime({ to, subject, text, html, replyTo, attachment }) {
+export function buildMime({ to, subject, text, html, replyTo, attachment, inline }) {
   const b1 = 'jl_mixed_' + Math.random().toString(36).slice(2);
   const b2 = 'jl_alt_' + Math.random().toString(36).slice(2);
+  const b3 = 'jl_rel_' + Math.random().toString(36).slice(2);
   const L = [];
   L.push(`To: ${cleanAddr(to)}`);
   if (replyTo) L.push(`Reply-To: ${cleanAddr(replyTo)}`);
@@ -71,7 +72,16 @@ export function buildMime({ to, subject, text, html, replyTo, attachment }) {
   L.push(`Content-Type: multipart/mixed; boundary="${b1}"`, '');
   L.push(`--${b1}`, `Content-Type: multipart/alternative; boundary="${b2}"`, '');
   L.push(`--${b2}`, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64Text(text), '');
-  L.push(`--${b2}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64Text(html), '');
+  if (inline) {
+    // HTML s obrázkem vloženým přímo do zprávy (odkaz cid:)
+    L.push(`--${b2}`, `Content-Type: multipart/related; boundary="${b3}"`, '');
+    L.push(`--${b3}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64Text(html), '');
+    L.push(`--${b3}`, `Content-Type: ${inline.type}`, 'Content-Transfer-Encoding: base64', `Content-ID: <${inline.cid}>`,
+      `Content-Disposition: inline; filename="${inline.name || 'qr.gif'}"`, '', wrap76(bytesToB64(inline.bytes)), '');
+    L.push(`--${b3}--`, '');
+  } else {
+    L.push(`--${b2}`, 'Content-Type: text/html; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64Text(html), '');
+  }
   L.push(`--${b2}--`, '');
   if (attachment) {
     const nm = cleanFileName(attachment.name);

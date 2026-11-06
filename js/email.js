@@ -4,6 +4,7 @@ import { S, firmaFor, quoteTotal } from './store.js';
 import { quoteDoc } from './doc.js';
 import { htmlToPdf, pdfName } from './pdf.js';
 import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.js';
+import { czIban, spayd, qrGif, inquiryVs } from './pay.js';
 
 const GOLD = '#b8975a', NAVY = '#22303C';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -50,19 +51,13 @@ export function buildText(q, f, message) {
   return `${message}\n\n${sig.join('\n')}\n`;
 }
 
-// HTML e-mail: tabulkové rozložení a inline styly, aby vypadal stejně v Gmailu, Outlooku i na mobilu
-export function buildHtml(q, f, message) {
-  const total = quoteTotal((q.items || []).filter((r) => r.name));
-  const validTo = fmtDate(addDays(q.issued_on, q.valid_days || f.valid_days || 30));
-  const paras = String(message).split(/\n{2,}/).map((p) =>
-    `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2b3640">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
-  const row = (k, v) => `<tr><td style="padding:7px 0;border-bottom:1px solid #e7dfd0;font-size:13px;color:#6b7580;width:42%">${esc(k)}</td><td style="padding:7px 0;border-bottom:1px solid #e7dfd0;font-size:14px;color:${NAVY};font-weight:600;text-align:right">${esc(v)}</td></tr>`;
-  const summary = [
-    row('Číslo nabídky', q.number),
-    q.project ? row('Akce', q.project) : '',
-    total > 0 ? row('Orientační cena', kc(total)) : '',
-    row('Platnost do', validTo),
-  ].join('');
+const paraHtml = (message) => String(message).split(/\n{2,}/).map((p) =>
+  `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2b3640">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+const rowHtml = (k, v) => `<tr><td style="padding:7px 0;border-bottom:1px solid #e7dfd0;font-size:13px;color:#6b7580;width:42%">${esc(k)}</td><td style="padding:7px 0;border-bottom:1px solid #e7dfd0;font-size:14px;color:${NAVY};font-weight:600;text-align:right">${esc(v)}</td></tr>`;
+
+// Společný rámec e-mailu: záhlaví, obsah, podpis s kontakty a odkazy na sítě, patička.
+// Tabulkové rozložení a inline styly, aby vypadal stejně v Gmailu, Outlooku i na mobilu.
+function frame(f, middle) {
   const links = socials(f).map(([n, u]) => `<a href="${esc(u)}" style="color:${GOLD};text-decoration:none;font-weight:600">${esc(n)}</a>`).join('<span style="color:#b5bcc3"> &nbsp;·&nbsp; </span>');
   const contact = [
     f.phone ? `Tel.: <a href="tel:${esc(String(f.phone).replace(/[^\d+]/g, ''))}" style="color:${NAVY};text-decoration:none">${esc(f.phone)}</a>` : '',
@@ -77,13 +72,7 @@ export function buildHtml(q, f, message) {
  <div style="font-size:24px;letter-spacing:3px;color:#ffffff;font-weight:700">JL-OBKLADY</div>
  <div style="font-size:11px;letter-spacing:2px;color:${GOLD};margin-top:6px">${esc(f.tagline || 'OBKLADY · DLAŽBY · KOUPELNY · DEKORATIVNÍ STĚRKY')}</div>
 </td></tr>
-<tr><td style="padding:30px 32px 6px">${paras}</td></tr>
-<tr><td style="padding:6px 32px 22px">
- <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ee;border-left:3px solid ${GOLD};padding:6px 16px"><tr><td style="padding:6px 16px">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${summary}</table>
-  <div style="font-size:12px;color:#6b7580;padding-top:10px">Podrobný rozpis prací a materiálů najdete v přiložené nabídce (PDF).</div>
- </td></tr></table>
-</td></tr>
+${middle}
 <tr><td style="padding:0 32px 26px;border-top:1px solid #eee7d8">
  <div style="padding-top:20px;font-size:15px;font-weight:700;color:${NAVY}">${esc(f.name || 'JL-OBKLADY')}</div>
  <div style="font-size:13px;line-height:1.7;color:#4a5560;padding-top:4px">${contact}</div>
@@ -91,6 +80,61 @@ export function buildHtml(q, f, message) {
 </td></tr>
 <tr><td style="background:${NAVY};padding:14px 32px;font-size:11px;color:#9fb0bd;letter-spacing:1px">PRECIZNÍ OBKLADY. DOKONALÝ DETAIL.</td></tr>
 </table></td></tr></table></body></html>`;
+}
+
+const box = (inner) => `<tr><td style="padding:6px 32px 22px">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ee;border-left:3px solid ${GOLD};padding:6px 16px"><tr><td style="padding:6px 16px">${inner}</td></tr></table>
+</td></tr>`;
+
+export function buildHtml(q, f, message) {
+  const total = quoteTotal((q.items || []).filter((r) => r.name));
+  const validTo = fmtDate(addDays(q.issued_on, q.valid_days || f.valid_days || 30));
+  const summary = [
+    rowHtml('Číslo nabídky', q.number),
+    q.project ? rowHtml('Akce', q.project) : '',
+    total > 0 ? rowHtml('Orientační cena', kc(total)) : '',
+    rowHtml('Platnost do', validTo),
+  ].join('');
+  return frame(f, `<tr><td style="padding:30px 32px 6px">${paraHtml(message)}</td></tr>` +
+    box(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${summary}</table>
+  <div style="font-size:12px;color:#6b7580;padding-top:10px">Podrobný rozpis prací a materiálů najdete v přiložené nabídce (PDF).</div>`));
+}
+
+// ---- platební údaje k objednané nabídce (QR platba) ----
+export const PAYMENT_FEE = 4000;
+
+export function paymentMessage(r, f) {
+  return [
+    'Dobrý den,',
+    '',
+    'děkujeme za Vaši objednávku cenové nabídky. Níže zasíláme platební údaje.',
+    '',
+    'Po připsání platby si na dohodnutý termín rezervujeme místo ve svém kalendáři. Zaplacená částka se na konci odečte od konečné ceny zakázky.',
+    '',
+    'V případě jakýchkoli dotazů nás neváhejte kontaktovat.',
+    '',
+    'S pozdravem',
+  ].join('\n');
+}
+
+export function buildPaymentHtml(f, message, { amount, vs, account, iban, hasQr }) {
+  const rows = [
+    rowHtml('Částka', kc(amount)),
+    rowHtml('Číslo účtu', account),
+    iban ? rowHtml('IBAN', iban) : '',
+    rowHtml('Variabilní symbol', vs),
+    rowHtml('Příjemce', f.name || 'JL-OBKLADY'),
+  ].join('');
+  const qr = hasQr ? `<div style="text-align:center;padding:14px 0 4px"><img src="cid:qrplatba" width="190" height="190" alt="QR platba" style="border:0;display:inline-block"><div style="font-size:12px;color:#6b7580;padding-top:6px">Naskenujte v mobilním bankovnictví</div></div>` : '';
+  return frame(f, `<tr><td style="padding:30px 32px 6px">${paraHtml(message)}</td></tr>` +
+    box(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>${qr}
+  <div style="font-size:12px;color:#6b7580;padding-top:10px">Před odesláním platby prosím zkontrolujte číslo účtu, částku a variabilní symbol.</div>`));
+}
+
+export function buildPaymentText(f, message, { amount, vs, account, iban }) {
+  const lines = [`Částka: ${kc(amount)}`, `Číslo účtu: ${account}`, iban && `IBAN: ${iban}`, `Variabilní symbol: ${vs}`];
+  const sig = [f.name, f.phone && 'tel. ' + f.phone, f.email, ...socials(f).filter(([n]) => n !== 'Web').map(([n, u]) => `${n}: ${u}`)].filter(Boolean);
+  return `${message}\n\n${lines.filter(Boolean).join('\n')}\n\n${sig.join('\n')}\n`;
 }
 
 const arr = async (blob) => new Uint8Array(await blob.arrayBuffer());
@@ -171,6 +215,71 @@ export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
       previewBox, status,
       h('div', { class: 'row', style: { justifyContent: 'space-between' } },
         h('div', { class: 'row' }, preview, fallback),
+        h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: close }, 'Zrušit'), gmailReady() ? send : null))));
+  document.body.append(overlay);
+}
+
+// Dialog pro odeslání platebních údajů z poptávky. Údaje dodavatele (účet, podpis) jsou podle přihlášeného profilu.
+export function openPaymentDialog(r, { onSent } = {}) {
+  const f = S.firma;
+  const account = String(f.account || '').trim();
+  const iban = czIban(account);
+  const vs = inquiryVs(r);
+  const to = h('input', { type: 'email', value: (String(r.email || '').match(EMAIL_RE) || [''])[0], placeholder: 'zakaznik@example.cz', autocomplete: 'off' });
+  const amt = h('input', { type: 'text', inputmode: 'numeric', value: String(PAYMENT_FEE) });
+  const subj = h('input', { type: 'text', value: 'Platební údaje k objednané nabídce' });
+  const msg = h('textarea', { rows: 9, style: { width: '100%' } }, paymentMessage(r, f));
+  const status = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
+  const previewBox = h('div');
+  const close = () => overlay.remove();
+  const info = () => ({ amount: Number(String(amt.value).replace(/\s/g, '').replace(',', '.')) || 0, vs, account, iban });
+
+  const send = h('button', { class: 'btn gold', onclick: async (e) => {
+    const addr = to.value.trim();
+    if (!EMAIL_RE.test(addr) || /[\s,;<>]/.test(addr) || /[^\x20-\x7e]/.test(addr)) { to.focus(); return toast('Zadejte platný e-mail příjemce (bez diakritiky).', 'err'); }
+    const i = info();
+    if (!(i.amount > 0)) return toast('Zadejte částku.', 'err');
+    if (!iban) return toast('V Nastavení vyplňte číslo účtu ve tvaru 123456789/0100.', 'err');
+    e.target.disabled = true;
+    try {
+      const tok = ensureGmailToken(); tok.catch(() => {});
+      await tok;
+      status.textContent = 'Odesílám e-mail…';
+      const gif = qrGif(spayd({ account, amount: i.amount, vs, msg: 'Nabidka ' + vs }));
+      const mime = buildMime({
+        to: addr, subject: subj.value.trim() || 'Platební údaje', replyTo: /^[^\s@]+@[^\s@]+$/.test(f.email || '') && !/[^\x20-\x7e]/.test(f.email) ? f.email : '',
+        text: buildPaymentText(f, msg.value, i), html: buildPaymentHtml(f, msg.value, { ...i, hasQr: !!gif }),
+        inline: gif ? { cid: 'qrplatba', bytes: gif, type: 'image/gif', name: 'qr-platba.gif' } : null,
+      });
+      await sendViaGmail(mime);
+      toast('Platební údaje odeslány na ' + addr);
+      close();
+      if (onSent) await onSent(addr, i);
+    } catch (er) { status.textContent = ''; toast(er.message, 'err'); e.target.disabled = false; }
+  } }, 'Odeslat e-mail');
+
+  const preview = h('button', { class: 'btn ghost small', onclick: () => {
+    const i = info();
+    const fr = h('iframe', { style: { width: '100%', height: '560px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff' } });
+    const gif = qrGif(spayd({ account, amount: i.amount, vs, msg: 'Nabidka ' + vs }));
+    let html = buildPaymentHtml(f, msg.value, { ...i, hasQr: !!gif });
+    if (gif) { let b = ''; gif.forEach((c) => { b += String.fromCharCode(c); }); html = html.replace('cid:qrplatba', 'data:image/gif;base64,' + btoa(b)); }
+    fr.srcdoc = html;
+    previewBox.replaceChildren(fr);
+  } }, 'Zobrazit náhled e-mailu');
+
+  const overlay = h('div', { class: 'overlay', style: { alignItems: 'flex-start', overflowY: 'auto' } },
+    h('div', { class: 'dialog', style: { maxWidth: '640px', margin: '12px auto' } },
+      h('h2', { style: { marginTop: 0 } }, 'Poslat platební údaje'),
+      iban ? h('p', { class: 'muted' }, `Příjemce platby: ${f.name || ''} · účet ${account} · variabilní symbol ${vs}`)
+        : h('p', { class: 'banner' }, 'V Nastavení (profil ' + (S.profile || '') + ') není vyplněné platné číslo účtu, např. 123456789/0100.'),
+      h('label', { class: 'f' }, 'Komu'), to,
+      h('label', { class: 'f' }, 'Částka (Kč)'), amt,
+      h('label', { class: 'f' }, 'Předmět'), subj,
+      h('label', { class: 'f' }, 'Text e-mailu (platební údaje, QR kód a podpis doplníme automaticky)'), msg,
+      previewBox, status,
+      h('div', { class: 'row', style: { justifyContent: 'space-between' } },
+        preview,
         h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: close }, 'Zrušit'), gmailReady() ? send : null))));
   document.body.append(overlay);
 }

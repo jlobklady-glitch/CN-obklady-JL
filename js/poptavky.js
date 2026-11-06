@@ -2,11 +2,13 @@
 // Data zapisuje Edge Function "poptavka"; aplikace je čte jen po přihlášení (pravidla RLS).
 import { h, toast, confirmBox, fmtDate } from './util.js';
 import { sb, newQuote, saveQuote } from './store.js';
+import { openPaymentDialog, PAYMENT_FEE } from './email.js';
+import { inquiryVs } from './pay.js';
 
-export const INQ_STATUS = [['nova', 'Nová'], ['kontaktovan', 'Kontaktován'], ['nabidka', 'Nabídka'], ['uzavreno', 'Vyřízeno'], ['zamitnuto', 'Zamítnuto']];
+export const INQ_STATUS = [['nova', 'Nová'], ['kontaktovan', 'Kontaktován'], ['ceka_platba', 'Čeká na platbu'], ['zaplaceno', 'Zaplaceno'], ['nabidka', 'Nabídka'], ['uzavreno', 'Vyřízeno'], ['zamitnuto', 'Zamítnuto']];
 const statusLabel = (k) => (INQ_STATUS.find(([x]) => x === k) || [k, k])[1];
-const BADGE = { nova: 'gold', kontaktovan: 'blue', nabidka: 'blue', uzavreno: 'ok', zamitnuto: 'bad' };
-const FILTERS = [['aktivni', 'Aktivní', ['nova', 'kontaktovan', 'nabidka']], ['nova', 'Nové', ['nova']], ['vyrizene', 'Vyřízené a zamítnuté', ['uzavreno', 'zamitnuto']], ['vse', 'Vše', null]];
+const BADGE = { nova: 'gold', kontaktovan: 'blue', ceka_platba: 'gold', zaplaceno: 'ok', nabidka: 'blue', uzavreno: 'ok', zamitnuto: 'bad' };
+const FILTERS = [['aktivni', 'Aktivní', ['nova', 'kontaktovan', 'ceka_platba', 'zaplaceno', 'nabidka']], ['nova', 'Nové', ['nova']], ['vyrizene', 'Vyřízené a zamítnuté', ['uzavreno', 'zamitnuto']], ['vse', 'Vše', null]];
 
 const BUCKET = 'inquiry-photos';
 
@@ -40,6 +42,7 @@ async function createQuoteFrom(r) {
   q.customer_contact = [r.phone, r.email].filter(Boolean).join(', ');
   q.customer_address = r.location || '';
   q.project = [r.work_type, r.location].filter(Boolean).join(' – ');
+  if (r.status === 'zaplaceno') q.note = [q.note, `Zaplaceno za nabídku ${PAYMENT_FEE} Kč (VS ${inquiryVs(r)}), odečte se z konečné ceny.`].filter(Boolean).join('\n');
   await saveQuote(q);
   const note = [r.note, `Nabídka ${q.number}`].filter(Boolean).join('\n');
   await patchInquiry(r.id, { status: 'nabidka', note });
@@ -91,6 +94,9 @@ export async function inquiriesView(root) {
       r.description ? h('p', { style: { whiteSpace: 'pre-wrap', margin: '6px 0' } }, r.description) : null,
       photosRow(r),
       h('div', { class: 'row', style: { marginTop: '8px' } }, sel,
+        h('button', { class: 'btn small', onclick: () => openPaymentDialog(r, { onSent: async () => {
+          if (r.status === 'nova' || r.status === 'kontaktovan') { await patchInquiry(r.id, { status: 'ceka_platba' }); r.status = 'ceka_platba'; sel.value = r.status; badge.className = 'badge ' + BADGE[r.status]; badge.textContent = statusLabel(r.status); }
+        } }) }, 'Platební údaje'),
         h('button', { class: 'btn small gold', onclick: async (e) => {
           if (!(await confirmBox('Vytvořit z této poptávky novou nabídku?'))) return;
           e.target.disabled = true;

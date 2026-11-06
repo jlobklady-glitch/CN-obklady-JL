@@ -24,3 +24,20 @@ export function qrSvg(text) {
   q.addData(text); q.make();
   return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 }
+
+// QR jako GIF (bajty) pro vložení do e-mailu – e-mailové programy SVG nezobrazují
+export function qrGif(text) {
+  if (!text || !window.qrcode) return null;
+  const q = window.qrcode(0, 'M');
+  q.addData(text); q.make();
+  const url = q.createDataURL(6, 2);
+  const b = atob(url.split(',')[1]);
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+}
+// Variabilní symbol poptávky: datum (RRMMDD) + 4 číslice z identifikátoru, stejný při každém otevření
+export function inquiryVs(r) {
+  const d = new Date(r.created_at);
+  const ymd = isNaN(d) ? '000000' : String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  const n = parseInt(String(r.id || '').replace(/[^0-9a-f]/gi, '').slice(0, 8) || '0', 16) % 10000;
+  return ymd + String(n).padStart(4, '0');
+}
