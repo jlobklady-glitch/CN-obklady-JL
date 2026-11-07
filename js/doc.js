@@ -4,7 +4,7 @@ import { S, lineTotal, quoteTotal, typeLabel, DEFAULT_QA, firmaFor } from './sto
 
 // Dodavatel aktuálně vykreslovaného dokladu (podle toho, kdo doklad vystavil)
 let F = S.firma;
-import { czIban, spayd, qrSvg, PACKAGE_FEE, packageUrl } from './pay.js';
+import { czIban, spayd, qrDueDate, qrSvg, PACKAGE_FEE, packageUrl } from './pay.js';
 
 export function quoteDoc(q) {
   F = firmaFor(q);
@@ -133,7 +133,7 @@ export function settlementDoc(q) {
 export function invoiceDoc(inv) {
   F = firmaFor(inv);
   const f = F;
-  const spd = spayd({ account: f.account, amount: Number(inv.amount), vs: inv.number, msg: 'Faktura ' + inv.number });
+  const spd = spayd({ account: f.account, amount: Number(inv.amount), vs: inv.number, msg: 'Faktura ' + inv.number, due: qrDueDate(inv.issued_on, inv.due_on) });
   const qr = qrSvg(spd);
   return `<div class="doc">${headBar('FAKTURA ' + esc(inv.number))}
     <div class="parties"><div class="sup"><div class="lab">Dodavatel</div><b>${esc(f.name)}</b><div>${esc(f.address)}</div><div>IČO: ${esc(f.ico)}</div>

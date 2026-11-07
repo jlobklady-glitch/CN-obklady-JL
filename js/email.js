@@ -5,7 +5,7 @@ import { quoteDoc, settlementDoc, invoiceDoc, settlementTotals, splitTotals } fr
 import { htmlToPdf, pdfName } from './pdf.js';
 import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.js';
 import { greeting } from './cs.js';
-import { czIban, spayd, qrGif, inquiryVs, PACKAGE_FEE, packageUrl } from './pay.js';
+import { czIban, spayd, qrDueDate, qrGif, inquiryVs, PACKAGE_FEE, packageUrl } from './pay.js';
 
 const GOLD = '#b8975a', NAVY = '#22303C';
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -190,7 +190,7 @@ export function buildInvoiceText(i, f, message) {
   const sig = [f.name, f.phone && 'tel. ' + f.phone, f.email, f.web, ...socials(f).filter(([n]) => n !== 'Web').map(([n, u]) => `${n}: ${u}`)].filter(Boolean);
   return `${message}\n\n${lines.filter((x) => x !== undefined && x !== false && x !== null).join('\n')}\n\n${sig.join('\n')}\n`;
 }
-const invQrGif = (i, f) => { const inf = invInfo(i, f); return inf.iban && inf.amount > 0 && !i.paid ? qrGif(spayd({ account: inf.account, amount: inf.amount, vs: inf.vs, msg: 'Faktura ' + i.number })) : null; };
+const invQrGif = (i, f) => { const inf = invInfo(i, f); return inf.iban && inf.amount > 0 && !i.paid ? qrGif(spayd({ account: inf.account, amount: inf.amount, vs: inf.vs, msg: 'Faktura ' + i.number, due: qrDueDate(i.issued_on, i.due_on) })) : null; };
 
 // ---- platební údaje k objednané nabídce (QR platba) ----
 export const PAYMENT_FEE = PACKAGE_FEE;

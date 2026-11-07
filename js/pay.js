@@ -9,13 +9,20 @@ export function czIban(account) {
   return 'CZ' + String(98 - r).padStart(2, '0') + bban;
 }
 const noDia = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 .,\-]/g, '').toUpperCase().slice(0, 60);
-export function spayd({ account, amount, vs, msg }) {
+// Datum splatnosti pro QR: nejdříve 3 dny po vystavení, jinak by banka nabídla okamžitou platbu (EET 2.0).
+export function qrDueDate(issued, due) {
+  const d = new Date((issued || new Date().toLocaleDateString('sv-SE')) + 'T12:00:00'); d.setDate(d.getDate() + 3);
+  const min = d.toLocaleDateString('sv-SE');
+  return due && due > min ? due : min;
+}
+export function spayd({ account, amount, vs, msg, due }) {
   const iban = czIban(account);
   if (!iban || !(amount > 0)) return '';
   let s = `SPD*1.0*ACC:${iban}*AM:${Number(amount).toFixed(2)}*CC:CZK`;
   const v = String(vs || '').replace(/\D/g, '').slice(0, 10);
   if (v) s += `*X-VS:${v}`;
   if (msg) s += `*MSG:${noDia(msg)}`;
+  if (due) s += `*DT:${String(due).replace(/-/g, '')}`;
   return s;
 }
 export function qrSvg(text) {
