@@ -291,7 +291,7 @@ export async function saveQuote(q, force = false) {
     number: q.number, issued_on: q.issued_on || isoToday(), valid_days: q.valid_days, customer_id: q.customer_id || null,
     customer_name: q.customer_name, customer_address: q.customer_address, customer_contact: q.customer_contact,
     project: q.project, note: q.note, premium: !!q.premium, items: q.items, status: q.status, payment_status: q.payment_status, settlement: q.settlement || {}, premium_items: q.premium_items || [], profile: q.profile || S.profile || null,
-    inquiry_id: q.inquiry_id || null, package_token: q.package_token || null, show_package: !!q.show_package,
+    job_from: q.job_from || null, inquiry_id: q.inquiry_id || null, package_token: q.package_token || null, show_package: !!q.show_package,
   };
   const data = await guardedUpdate('quotes', row, q.id, q.updated_at, force);
   q.updated_at = data.updated_at;
@@ -306,6 +306,7 @@ export async function newBezCN(code) {
     q = data;
   } else q = await newQuote();
   q.settlement = { bez: true, items: [], advance: 0, note: '' };
+  q.status = 'Potvrzena';
   return saveQuote(q);
 }
 export async function deleteQuote(id) {
@@ -315,7 +316,7 @@ export async function deleteQuote(id) {
 export async function duplicateQuote(q) {
   for (let i = 0; ; i++) {
     const number = await nextQuoteNumber();
-    const row = { ...q, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno', settlement: {}, inquiry_id: null, package_token: null, show_package: false };
+    const row = { ...q, number, issued_on: isoToday(), status: 'Rozpracovaná', payment_status: 'Nezaplaceno', settlement: {}, inquiry_id: null, package_token: null, show_package: false, job_from: null };
     delete row.id; delete row.created_at; delete row.updated_at;
     const { data, error } = await sb.from('quotes').insert(row).select().single();
     if (!error) return data;
