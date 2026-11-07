@@ -23,13 +23,17 @@ export async function ensureCalToken() {
   if (token && Date.now() < tokenExp - 30000) return token;
   await loadGsi();
   return new Promise((res, rej) => {
-    client = client || window.google.accounts.oauth2.initTokenClient({ client_id: GOOGLE_CLIENT_ID, scope: SCOPE, callback: () => {} });
+    client = client || window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID, scope: SCOPE, callback: () => {},
+      error_callback: (e) => { if (client && client.fail) client.fail(new Error(e && e.type === 'popup_closed' ? 'Přihlášení k Googlu bylo zavřeno.' : e && e.type === 'popup_failed_to_open' ? 'Prohlížeč zablokoval okno přihlášení – povolte vyskakovací okna a klikněte znovu.' : 'Přihlášení k Googlu se nezdařilo.')); },
+    });
+    client.fail = rej;
     client.callback = (r) => {
       if (r.error) return rej(new Error('Google: ' + (r.error_description || r.error)));
-      if (!window.google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return rej(new Error('Nebylo povoleno čtení kalendáře.'));
+      if (!window.google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return rej(new Error('Nebylo povoleno čtení kalendáře – při přihlášení zaškrtněte oprávnění k Google Kalendáři.'));
       token = r.access_token; tokenExp = Date.now() + Number(r.expires_in || 3600) * 1000; res(token);
     };
-    client.requestAccessToken({ prompt: token === null && !ls.get('granted', '') ? 'consent' : '' });
+    client.requestAccessToken({ prompt: ls.get('granted', '') ? '' : 'consent' });
   }).then((t) => { ls.set('granted', '1'); return t; });
 }
 const api = async (path) => {
@@ -123,7 +127,8 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     for (const w of who.length === workers.length && workers.length > 1 ? [] : who) {
       const gid = L.ev.id + ':' + w;
       if (known.has(gid) || skipped.has(L.ev.id)) continue;
-      const q = dayQuote[L.date + '|' + w];
+      const explicit = findQuote(L.title, quotes);
+      const q = explicit ? explicit.number : dayQuote[L.date + '|' + w];
       if (q && L.amount > 0) {
         const r = await addRecord('cost', { quote: q, desc: L.what, payer: w, amount: L.amount, gcal_id: gid, gcal_upd: L.ev.updated }, L.date);
         known.set(gid, r); res.created++;
@@ -137,6 +142,7 @@ export async function syncCalendar({ calendarId, days = 45 }) {
 
 // ---- panel v Hodinách ----
 export function calendarPanel(onChange) {
+  loadGsi().catch(() => {}); // předem, aby okno přihlášení nebylo zablokováno
   const box = h('div', { class: 'card' });
   const status = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
   const queueBox = h('div');
@@ -179,20 +185,20 @@ export function calendarPanel(onChange) {
     try {
       const tok = ensureCalToken(); tok.catch(() => {});
       await tok;
-      status.textContent = 'Načítám kalendáře…';
-      if (!calSel.options.length || calSel.options.length === 1) {
-        const cals = await listCalendars();
-        const cur = ls.get('cal', '');
-        calSel.replaceChildren(...cals.map((c) => h('option', { value: c.id, selected: cur ? c.id === cur : c.primary }, c.name)));
-        if (!cur) ls.set('cal', calSel.value);
-        if (cals.length > 1) { status.textContent = 'Vyberte kalendář a klikněte znovu.'; e.target.disabled = false; return; }
-      }
+      status.style.color = ''; status.textContent = 'Načítám kalendáře…';
+      const cals = await listCalendars();
+      const cur = ls.get('cal', '');
+      const want = cals.some((c) => c.id === cur) ? cur : (cals.find((c) => c.primary) || cals[0] || {}).id;
+      calSel.replaceChildren(...cals.map((c) => h('option', { value: c.id, selected: c.id === want }, c.name)));
+      calSel.value = want;
+      if (cals.length > 1 && !cals.some((c) => c.id === cur)) { status.textContent = 'Vyberte kalendář s pracovními událostmi a klikněte na „Načíst z kalendáře“ znovu.'; e.target.disabled = false; return; }
+      ls.set('cal', want);
       status.textContent = 'Načítám události…';
       const quotes = await listQuotes();
       const r = await syncCalendar({ calendarId: calSel.value || ls.get('cal', 'primary') });
       status.textContent = `Nově zapsáno ${r.created}, aktualizováno ${r.updated}, ke kontrole ${r.queue.length}. ` + last();
       drawQueue(r.queue, quotes); onChange();
-    } catch (er) { status.textContent = ''; toast(er.message, 'err'); }
+    } catch (er) { status.textContent = 'Chyba: ' + er.message; status.style.color = 'var(--bad, #b00020)'; toast(er.message, 'err'); }
     e.target.disabled = false;
   } }, 'Načíst z kalendáře');
 
