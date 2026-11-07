@@ -42,7 +42,7 @@ export async function settlementEditor(root, id) {
     const line = (l, v, b) => h('div', { class: 'row between', style: { padding: '3px 0', fontWeight: b ? 800 : 400 } }, h('span', null, l), h('span', null, v));
     const sp = splitTotals((st.items || []).filter((r) => r.name));
     sums.replaceChildren(...[(sp.hasWork || sp.hasMat) && line('Práce celkem (včetně dopravy)', kc(sp.work)), (sp.hasWork || sp.hasMat) && line('Materiál celkem', kc(sp.mat)), !bez && line(`Celkem dle nabídky ${q.number}`, kc(t.offer)), !bez && line('Rozdíl oproti nabídce', kc(t.diff)),
-      line('Celkem skutečně', kc(t.actual), true), t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true)].filter(Boolean));
+      t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true)].filter(Boolean));
   };
   const touch = () => { saver.touch(); drawSums(); };
   window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;

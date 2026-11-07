@@ -142,7 +142,6 @@ export function buildSettlementHtml(q, f, message) {
     q.project ? rowHtml('Akce', q.project) : '',
     rowHtml('Datum vyúčtování', fmtDate(st.date || new Date().toISOString().slice(0, 10))),
     sp.hasWork && sp.hasMat ? rowHtml('Práce (včetně dopravy)', kc(sp.work)) + rowHtml('Materiál', kc(sp.mat)) : '',
-    rowHtml('Celkem skutečně', kc(t.actual)),
     t.advance ? rowHtml('Uhrazená záloha', kc(-t.advance)) : '',
     t.due < 0 ? rowHtml('Přeplatek k vrácení', kc(-t.due)) : rowHtml(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due)),
   ].join('');
