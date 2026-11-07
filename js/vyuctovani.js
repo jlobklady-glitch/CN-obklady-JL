@@ -4,23 +4,25 @@ import { S, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice,
 import { itemsEditor } from './items.js';
 import { openEmailDialog } from './email.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
-import { settlementDoc, settlementTotals, splitTotals, invoiceDoc, printDoc } from './doc.js';
+import { settlementDoc, settlementTotals, splitTotals, SET_STATES, settlementStatus, invoiceDoc, printDoc } from './doc.js';
 
 // Přehled vyúčtování (rychlý přístup z menu)
 export async function settlementsList(root) {
   root.append(h('p', { class: 'muted' }, 'Načítám…'));
-  const all = (await listQuotes()).filter((r) => r.settlement && r.settlement.items);
+  const [allQ, invs] = await Promise.all([listQuotes(), listInvoices()]);
+  const all = allQ.filter((r) => r.settlement && r.settlement.items);
   const sorted = all.sort((a, b) => String((b.settlement.date) || b.issued_on).localeCompare(String(a.settlement.date || a.issued_on)));
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Vyúčtování'),
       h('button', { class: 'btn gold', onclick: async () => { try { const n = await newBezCN(); location.hash = '#/vyuctovani/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, '+ Vyúčtování bez CN')),
     h('p', { class: 'muted' }, 'Vyúčtování k nabídkám se vytváří v detailu nabídky tlačítkem „Vyúčtování“. Zde jsou všechna už vytvořená a můžete založit nové bez cenové nabídky.'),
     h('div', { class: 'tablewrap' }, h('table', { class: 't' },
-      h('thead', null, h('tr', null, ['Nabídka', 'Datum', 'Odběratel', 'Stavba', 'Skutečně'].map((t, i) => h('th', { class: i === 4 ? 'r' : '' }, t)))),
+      h('thead', null, h('tr', null, ['Nabídka', 'Datum', 'Odběratel', 'Stavba', 'Stav', 'Částka'].map((t, i) => h('th', { class: i === 5 ? 'r' : '' }, t)))),
       h('tbody', null, sorted.length ? sorted.map((r) => h('tr', { class: 'click', onclick: () => { location.hash = '#/vyuctovani/' + r.id; } },
         h('td', null, h('b', null, r.settlement.bez ? '—' : r.number), r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null),
         h('td', null, fmtDate(r.settlement.date || r.issued_on)), h('td', null, r.customer_name || '—'), h('td', null, r.project || ''),
-        h('td', { class: 'r' }, kc(settlementTotals(r).actual)))) : h('tr', null, h('td', { colspan: 5, class: 'muted' }, 'Zatím žádné vyúčtování.'))))));
+        h('td', null, (() => { const s = settlementStatus(r, invs); return h('span', { class: 'badge ' + (s.key === 'fakturovano' || s.key === 'schvaleno' ? 'ok' : s.key === 'zaslano' ? 'gold' : '') }, s.label); })()),
+        h('td', { class: 'r' }, kc(settlementTotals(r).actual)))) : h('tr', null, h('td', { colspan: 6, class: 'muted' }, 'Zatím žádné vyúčtování.'))))));
 }
 
 const put = (root, ...c) => root.replaceChildren(...c.filter(Boolean));
@@ -87,16 +89,19 @@ export async function settlementEditor(root, id) {
         } catch (e) { toast(e.message, 'err'); }
       } }, '+ Vystavit fakturu na ' + kc(settlementTotals(q).due))));
   };
+  const stateSel = h('select', { onchange: (e) => { q.settlement.state = e.target.value; if (e.target.value === 'zaslano' && !q.settlement.sent_at) q.settlement.sent_at = isoToday(); touch(); } },
+    SET_STATES.map(([k, l]) => h('option', { value: k, selected: k === ((q.settlement && q.settlement.state) || 'rozpracovane') }, l)));
   const preview = h('div');
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/vyuctovani' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
-      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(q, { mode: 'settlement', beforeOpen: () => saver.flush() }) }, 'Poslat e-mailem'),
+      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(q, { mode: 'settlement', beforeOpen: () => saver.flush(), onSent: async () => { if (!q.settlement.state || q.settlement.state === 'rozpracovane') { q.settlement.state = 'zaslano'; q.settlement.sent_at = isoToday(); stateSel.value = 'zaslano'; touch(); await saver.flush(); } } }) }, 'Poslat e-mailem'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
     bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
+    h('div', { class: 'card' }, h('div', { class: 'grid c3' }, fld('Stav vyúčtování', stateSel, ''), h('div', { class: 'muted', style: { alignSelf: 'end', paddingBottom: '8px' } }, 'Po vystavení faktury se stav změní na „Fakturováno“ sám.'))),
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
       fld('Datum vyúčtování', h('input', { type: 'date', value: st.date || isoToday(), oninput: bind(st, 'date') })),
       fld('Uhrazená záloha (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: st.advance || '', oninput: bind(st, 'advance', true) })),

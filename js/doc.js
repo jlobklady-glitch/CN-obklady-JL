@@ -91,6 +91,14 @@ export function settlementTotals(q) {
   return { actual, offer, advance, diff: actual - offer, due: actual - advance, bez: !!st.bez };
 }
 
+// Stav vyúčtování: ručně Rozpracované → Zasláno → Schváleno; „Fakturováno“ se pozná samo podle vystavené faktury k zakázce.
+export const SET_STATES = [['rozpracovane', 'Rozpracované'], ['zaslano', 'Zasláno zákazníkovi'], ['schvaleno', 'Schváleno zákazníkem']];
+export function settlementStatus(q, invoices = []) {
+  if (invoices.some((i) => i.quote_id === q.id)) return { key: 'fakturovano', label: 'Fakturováno' };
+  const k = (q.settlement && q.settlement.state) || 'rozpracovane';
+  return { key: k, label: (SET_STATES.find((x) => x[0] === k) || SET_STATES[0])[1] };
+}
+
 export function settlementDoc(q) {
   F = firmaFor(q);
   const st = q.settlement || {};
