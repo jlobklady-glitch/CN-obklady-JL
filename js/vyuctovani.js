@@ -1,9 +1,26 @@
 // Finální vyúčtování (k nabídce nebo bez CN) a faktury.
 import { h, kc, fmtDate, toast, confirmBox, makeSaver, parseNum, isoToday, addDays } from './util.js';
-import { S, getQuote, saveQuote, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
+import { S, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 import { settlementDoc, settlementTotals, invoiceDoc, printDoc } from './doc.js';
+
+// Přehled vyúčtování (rychlý přístup z menu)
+export async function settlementsList(root) {
+  root.append(h('p', { class: 'muted' }, 'Načítám…'));
+  const all = (await listQuotes()).filter((r) => r.settlement && r.settlement.items);
+  const sorted = all.sort((a, b) => String((b.settlement.date) || b.issued_on).localeCompare(String(a.settlement.date || a.issued_on)));
+  root.replaceChildren(
+    h('div', { class: 'pagehead' }, h('h1', null, 'Vyúčtování'),
+      h('button', { class: 'btn gold', onclick: async () => { try { const n = await newBezCN(); location.hash = '#/vyuctovani/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, '+ Vyúčtování bez CN')),
+    h('p', { class: 'muted' }, 'Vyúčtování k nabídkám se vytváří v detailu nabídky tlačítkem „Vyúčtování“. Zde jsou všechna už vytvořená a můžete založit nové bez cenové nabídky.'),
+    h('div', { class: 'tablewrap' }, h('table', { class: 't' },
+      h('thead', null, h('tr', null, ['Nabídka', 'Datum', 'Odběratel', 'Stavba', 'Skutečně'].map((t, i) => h('th', { class: i === 4 ? 'r' : '' }, t)))),
+      h('tbody', null, sorted.length ? sorted.map((r) => h('tr', { class: 'click', onclick: () => { location.hash = '#/vyuctovani/' + r.id; } },
+        h('td', null, h('b', null, r.settlement.bez ? '—' : r.number), r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null),
+        h('td', null, fmtDate(r.settlement.date || r.issued_on)), h('td', null, r.customer_name || '—'), h('td', null, r.project || ''),
+        h('td', { class: 'r' }, kc(settlementTotals(r).actual)))) : h('tr', null, h('td', { colspan: 5, class: 'muted' }, 'Zatím žádné vyúčtování.'))))));
+}
 
 const put = (root, ...c) => root.replaceChildren(...c.filter(Boolean));
 
@@ -27,7 +44,15 @@ export async function settlementEditor(root, id) {
   };
   const touch = () => { saver.touch(); drawSums(); };
   window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;
-  const ed = itemsEditor(st.items, touch);
+  // Materiál MAPEI: ceníková cena + sleva pro zákazníka (volí se zde). Interní nákupní sleva z Nastavení se v dokladu nikdy neukazuje.
+  const listOf = (r) => { const p = r.typ === 'mapei' && r.item_id ? S.prices.find((x) => x.id === r.item_id) : null; return p && Number(p.price) > 0 ? Number(p.price) / (Number(r.roll) || 1) : null; };
+  const hints = [];
+  const hintFor = (r) => {
+    const el = h('div', { class: 'small muted' });
+    const upd = () => { const l = listOf(r); const d = Math.min(Math.max(Number(r.disc) || 0, 0), 1); el.textContent = l ? `Ceníková cena ${kc(l)} / ${r.unit || 'MJ'}${d ? ` · po slevě ${Math.round(d * 1000) / 10} % = ${kc(Math.round(l * (1 - d) * 100) / 100)}` : ' · sleva nezadána'}` : ''; };
+    upd(); hints.push(upd); return el;
+  };
+  const ed = itemsEditor(st.items, () => { hints.forEach((f) => f()); touch(); }, null, hintFor, { listMapei: true, discFor: () => Number(st.mapei_disc) || 0 });
   const bind = (obj, k, num) => (e) => { obj[k] = num ? parseNum(e.target.value) : e.target.value; touch(); };
 
   let custCard = null;
@@ -62,7 +87,7 @@ export async function settlementEditor(root, id) {
   };
   const preview = h('div');
   put(root,
-    h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/nabidky' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
+    h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/vyuctovani' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
@@ -73,6 +98,16 @@ export async function settlementEditor(root, id) {
       fld('Datum vyúčtování', h('input', { type: 'date', value: st.date || isoToday(), oninput: bind(st, 'date') })),
       fld('Uhrazená záloha (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: st.advance || '', oninput: bind(st, 'advance', true) })),
       !bez && h('div', null, h('label', { class: 'f' }, ' '), h('button', { class: 'btn ghost', onclick: async () => { if (await confirmBox('Přepsat položky vyúčtování znovu podle nabídky?')) { st.items.splice(0, st.items.length, ...JSON.parse(JSON.stringify(q.items || []))); st.offer = quoteTotal(q.items || []); ed.redraw(); touch(); } } }, 'Načíst znovu z nabídky')))),
+    h('div', { class: 'card' }, h('h2', null, 'Materiál MAPEI – cena pro zákazníka'),
+      h('p', { class: 'muted' }, 'Materiál se vkládá za ceníkovou cenu MAPEI. Zde zvolíte slevu, kterou dáte zákazníkovi; do dokladu se píše ceníková cena, sleva a cena po slevě. Vaše nákupní sleva z Nastavení se v dokladu neukazuje.'),
+      h('div', { class: 'row', style: { gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' } },
+        fld('Sleva zákazníkovi (%)', h('input', { type: 'text', inputmode: 'decimal', class: 'num', style: { width: '90px' }, value: st.mapei_disc ? Math.round(st.mapei_disc * 1000) / 10 : '', oninput: (e) => { st.mapei_disc = Math.min(Math.max(parseNum(e.target.value), 0), 100) / 100; saver.touch(); } })),
+        h('button', { class: 'btn ghost', onclick: () => {
+          const rows = st.items.filter((r) => listOf(r));
+          if (!rows.length) return toast('Ve vyúčtování není žádný materiál MAPEI z ceníku.', 'err');
+          for (const r of rows) { r.price = Math.round(listOf(r) * 100) / 100; r.disc = Number(st.mapei_disc) || 0; }
+          hints.length = 0; ed.redraw(); touch(); toast(`Přepočteno: ${rows.length} řádků na ceníkovou cenu se slevou ${Math.round((Number(st.mapei_disc) || 0) * 1000) / 10} %`);
+        } }, 'Použít na všechen materiál MAPEI'))),
     h('div', { class: 'card' }, h('h2', null, 'Skutečně provedené položky'), ed.box,
       h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: () => ed.add() }, '+ Přidat řádek'))),
     sums,

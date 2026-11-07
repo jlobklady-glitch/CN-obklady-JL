@@ -2,7 +2,7 @@
 import { h, kc, matcher, parseNum } from './util.js';
 import { S, TYPES, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal } from './store.js';
 
-export function suggestBox(input, onPick, filter = () => true) {
+export function suggestBox(input, onPick, filter = () => true, priceOf = (p) => priceFor(p, 1)) {
   const wrap = h('div', { class: 'suggest-wrap' });
   let box = null, sel = -1, list = [];
   const close = () => { box?.remove(); box = null; sel = -1; };
@@ -13,7 +13,7 @@ export function suggestBox(input, onPick, filter = () => true) {
     close();
     if (!list.length) return;
     box = h('div', { class: 'suggest' }, list.map((p, i) => h('div', { onmousedown: (e) => { e.preventDefault(); pick(i); } },
-      displayName(p), h('small', null, `${kc(priceFor(p, 1))} / ${displayUnit(p)} · ${typeLabel(p.category)}`))));
+      displayName(p), h('small', null, `${kc(priceOf(p))} / ${displayUnit(p)} · ${typeLabel(p.category)}`))));
     wrap.append(box);
   };
   const pick = (i) => { const p = list[i]; close(); onPick(p); };
@@ -33,7 +33,8 @@ export function suggestBox(input, onPick, filter = () => true) {
 }
 
 // items: pole řádků (upravuje se přímo), onTouch: volá se po každé změně
-export function itemsEditor(items, onTouch, onPick, extra) {
+// opts.listMapei: materiál MAPEI se vkládá za ceníkovou cenu (bez interní nákupní slevy); opts.discFor(): sleva pro zákazníka (0–1) předvyplněná u MAPEI
+export function itemsEditor(items, onTouch, onPick, extra, opts = {}) {
   const box = h('div', { class: 'items' });
   const totalV = h('div', { class: 'v' });
   const recalc = () => { totalV.textContent = kc(quoteTotal(items)); };
@@ -60,12 +61,14 @@ export function itemsEditor(items, onTouch, onPick, extra) {
     const discIn = h('input', { type: 'text', inputmode: 'decimal', class: 'num', value: r.disc ? Math.round(r.disc * 1000) / 10 : '', oninput: (e) => { r.disc = Math.min(Math.max(parseNum(e.target.value), 0), 100) / 100; upd(); } });
     const sug = suggestBox(nameIn, (p) => {
       r.item_id = p.id; r.name = displayName(p); r.unit = displayUnit(p); r.typ = p.category;
-      r.qty = r.qty || 1; r.price = priceFor(p, r.qty);
+      r.qty = r.qty || 1; r.price = opts.listMapei && p.category === 'mapei' ? Number(p.price) || 0 : priceFor(p, r.qty);
+      r.disc = opts.listMapei && p.category === 'mapei' && opts.discFor ? opts.discFor() || 0 : r.disc || 0;
+      discIn.value = r.disc ? Math.round(r.disc * 1000) / 10 : '';
       nameIn.value = r.name; grow(nameIn); unitIn.value = r.unit; priceIn.value = r.price; qtyIn.value = r.qty;
       [...typSel.options].forEach((o) => { o.selected = o.text === typeLabel(r.typ); });
       upd();
       if (onPick) onPick(p, r);
-    });
+    }, undefined, opts.listMapei ? (p) => (p.category === 'mapei' ? Number(p.price) || 0 : priceFor(p, 1)) : undefined);
     return h('div', { class: 'item' }, h('div', { class: 'c-typ' }, typSel), h('div', { class: 'c-name' }, sug, extra ? extra(r) : null), h('div', { class: 'c-mj', 'data-l': 'MJ' }, unitIn),
       h('div', { class: 'c-qty', 'data-l': 'Množství' }, qtyIn), h('div', { class: 'c-price', 'data-l': 'Cena / MJ' }, priceIn), h('div', { class: 'c-disc', 'data-l': 'Sleva %' }, discIn), tot,
       h('div', { class: 'c-del' }, h('button', { class: 'del', title: 'Smazat řádek', onclick: () => { items.splice(i, 1); draw(); onTouch(); } }, '×')));

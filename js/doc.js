@@ -91,14 +91,6 @@ export function settlementTotals(q) {
   return { actual, offer, advance, diff: actual - offer, due: actual - advance, bez: !!st.bez };
 }
 
-// ceníková cena za MJ u materiálu MAPEI (podle položky ceníku); jinak cena řádku
-function listPrice(r) {
-  if (r.typ !== 'mapei' || !r.item_id) return null;
-  const p = S.prices.find((x) => x.id === r.item_id);
-  if (!p || !(Number(p.price) > 0)) return null;
-  const l = Number(p.price) / (Number(r.roll) || 1);
-  return l >= parseNum(r.price) ? l : null;
-}
 export function settlementDoc(q) {
   F = firmaFor(q);
   const st = q.settlement || {};
@@ -108,8 +100,8 @@ export function settlementDoc(q) {
   const rows = items.map((r, i) => {
     const p = parseNum(r.price), d = Math.min(Math.max(parseNum(r.disc), 0), 1);
     const after = Math.round(p * (1 - d) * 100) / 100;
-    const list = listPrice(r) ?? p;
-    const sl = list > 0 ? 1 - after / list : 0;
+    const list = p; // ceníková cena = cena řádku; sleva je jen ta, kterou jste dali zákazníkovi (nákupní sleva z Nastavení se v dokladu neukazuje)
+    const sl = d;
     return `<tr><td class="c">${i + 1}</td><td class="typ">${esc(typeLabel(r.typ))}</td><td>${esc(r.name)}</td><td class="c">${esc(r.unit)}</td>
     <td class="c">${num(r.qty)}</td><td class="r">${kc(Math.round(list * 100) / 100)}</td><td class="c">${pct(sl)}</td><td class="r">${kc(after)}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`;
   }).join('');

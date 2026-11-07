@@ -4,7 +4,7 @@ import { backupToDrive } from './backup.js';
 import { sb, S, loadAll, profileList, setProfile, listInvoices } from './store.js';
 import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
-import { settlementEditor, invoiceEditor } from './vyuctovani.js';
+import { settlementEditor, settlementsList, invoiceEditor } from './vyuctovani.js';
 import { prehledView } from './prehled.js';
 import { openBundledPrace, bundledPending } from './cenikimport.js';
 import { orderView } from './objednavka.js';
@@ -65,7 +65,7 @@ function profilePicker(then) {
       h('p', { class: 'muted' }, 'Profil mění jen údaje dodavatele v záhlaví nabídek a faktur. Data jsou společná. Profil lze kdykoli změnit v menu.'))));
 }
 
-const TABS = [['#/prehled', 'Přehled'], ['#/poptavky', 'Poptávky'], ['#/nabidky', 'Nabídky'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
+const TABS = [['#/prehled', 'Přehled'], ['#/poptavky', 'Poptávky'], ['#/nabidky', 'Nabídky'], ['#/vyuctovani', 'Vyúčtování'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 function stackAll(el) {
   el.querySelectorAll('table.t').forEach((t) => {
@@ -91,7 +91,7 @@ async function route() {
   const hash = location.hash || '#/prehled';
   lastHash = hash;
   const main = h('main');
-  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/objednavka/') || hash.startsWith('#/protokol/') || hash.startsWith('#/vyuctovani/') || hash.startsWith('#/faktura/')));
+  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/objednavka/') || hash.startsWith('#/protokol/'))) || (href === '#/vyuctovani' && hash.startsWith('#/faktura/'));
   const close = () => { drawer.classList.remove('open'); scrim.classList.remove('open'); };
   const scrim = h('div', { class: 'scrim', onclick: close });
   const drawer = h('aside', { class: 'drawer' },
@@ -112,6 +112,7 @@ async function route() {
     if (hash.startsWith('#/nabidka/')) await quoteEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/vyuctovani/')) await settlementEditor(main, hash.split('/')[2]);
     else if (hash.startsWith('#/faktura/')) await invoiceEditor(main, hash.split('/')[2]);
+    else if (hash === '#/vyuctovani') await settlementsList(main);
     else if (hash.startsWith('#/objednavka/')) await orderView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/protokol/')) await handoverView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/poptavky')) await inquiriesView(main);
