@@ -94,6 +94,16 @@ export function confirmBox(text) {
   });
 }
 
+export function askText(title, hint, value = '') {
+  return new Promise((resolve) => {
+    const done = (v) => { overlay.remove(); resolve(v); };
+    const inp = h('input', { type: 'text', value, placeholder: hint || '', style: { width: '100%' }, onkeydown: (e) => { if (e.key === 'Enter') done(inp.value.trim()); } });
+    const overlay = h('div', { class: 'overlay' }, h('div', { class: 'dialog' }, h('p', null, title), inp,
+      h('div', { class: 'row end', style: { marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: () => done(null) }, 'Zrušit'), h('button', { class: 'btn gold', onclick: () => done(inp.value.trim()) }, 'Vytvořit'))));
+    document.body.append(overlay); inp.focus();
+  });
+}
+
 export function uid() {
   return (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2) + Date.now().toString(36));
 }

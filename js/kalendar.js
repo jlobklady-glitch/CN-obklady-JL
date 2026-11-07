@@ -56,9 +56,10 @@ export function findQuote(title, quotes) {
 }
 export function parseLunch(title) {
   const t = norm(title);
-  if (!/\bobed/.test(t)) return null;
+  const kind = /\bobed/.test(t) ? 'Oběd' : /svacin/.test(t) ? 'Svačina' : null;
+  if (!kind) return null;
   const m = t.match(/(\d[\d\s]*(?:[.,]\d+)?)\s*(?:kc|czk)?\s*$/) || t.match(/(\d+(?:[.,]\d+)?)/);
-  return m ? { amount: Number(String(m[1]).replace(/\s/g, '').replace(',', '.')) || 0 } : { amount: 0 };
+  return { kind, amount: m ? Number(String(m[1]).replace(/\s/g, '').replace(',', '.')) || 0 : 0 };
 }
 export function eventHours(ev) {
   if (!ev.start || !ev.start.dateTime || !ev.end || !ev.end.dateTime) return null; // celodenní
@@ -94,7 +95,7 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const title = ev.summary;
     const date = ev.start && (ev.start.dateTime ? pragueDate(ev.start.dateTime) : ev.start.date);
     const lunch = parseLunch(title);
-    if (lunch) { lunches.push({ ev, title, date, amount: lunch.amount }); continue; }
+    if (lunch) { lunches.push({ ev, title, date, amount: lunch.amount, what: lunch.kind }); continue; }
     const who = workersIn(title, workers);
     const quote = findQuote(title, quotes);
     const hrs = eventHours(ev);
@@ -120,11 +121,11 @@ export async function syncCalendar({ calendarId, days = 45 }) {
       if (known.has(gid) || skipped.has(L.ev.id)) continue;
       const q = dayQuote[L.date + '|' + w];
       if (q && L.amount > 0) {
-        const r = await addRecord('cost', { quote: q, desc: 'Oběd', payer: w, amount: L.amount, gcal_id: gid, gcal_upd: L.ev.updated }, L.date);
+        const r = await addRecord('cost', { quote: q, desc: L.what, payer: w, amount: L.amount, gcal_id: gid, gcal_upd: L.ev.updated }, L.date);
         known.set(gid, r); res.created++;
-      } else res.queue.push({ ev: L.ev, id: L.ev.id, title: L.title, date: L.date, who: [w], amount: L.amount, quote: q || '', kind: 'lunch' });
+      } else res.queue.push({ ev: L.ev, id: L.ev.id, title: L.title, date: L.date, who: [w], amount: L.amount, quote: q || '', kind: 'lunch', what: L.what });
     }
-    if (who.length === workers.length && workers.length > 1) res.queue.push({ ev: L.ev, id: L.ev.id, title: L.title, date: L.date, who: [], amount: L.amount, quote: '', kind: 'lunch', note: 'V nadpisu oběda chybí jméno (Lukáš / Honza).' });
+    if (who.length === workers.length && workers.length > 1) res.queue.push({ ev: L.ev, id: L.ev.id, title: L.title, date: L.date, who: [], amount: L.amount, quote: '', kind: 'lunch', what: L.what, note: 'V nadpisu oběda chybí jméno (Lukáš / Honza).' });
   }
   ls.set('last', new Date().toISOString());
   return res;
@@ -155,7 +156,7 @@ export function calendarPanel(onChange) {
           try {
             if (it.kind === 'lunch') {
               const w = wSel.value; if (!w) { e.target.disabled = false; return toast('Vyberte, kdo měl oběd.', 'err'); }
-              await addRecord('cost', { quote: qn, desc: 'Oběd', payer: w, amount: v, gcal_id: it.id + ':' + w, gcal_upd: it.ev.updated }, it.date);
+              await addRecord('cost', { quote: qn, desc: it.what || 'Oběd', payer: w, amount: v, gcal_id: it.id + ':' + w, gcal_upd: it.ev.updated }, it.date);
             } else for (const w of it.who) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w, gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
             tr.remove(); onChange();
           } catch (er) { toast(er.message, 'err'); e.target.disabled = false; }
@@ -189,7 +190,7 @@ export function calendarPanel(onChange) {
   } }, 'Načíst z kalendáře');
 
   box.append(h('h2', null, 'Google Kalendář'),
-    h('p', { class: 'muted' }, 'V nadpisu události uveďte číslo nabídky (např. „Lukáš Honza 2026-014“). Bez jména se hodiny zapíšou oběma, s jedním jménem jen tomu. Hodiny se berou z času začátku a konce, bez odečtu pauz. Oběd: „Lukáš oběd 400“ (zapíše se k zakázce, na které ten den měl hodiny).'),
+    h('p', { class: 'muted' }, 'V nadpisu události uveďte číslo nabídky (např. „Lukáš Honza 2026-014“). Bez jména se hodiny zapíšou oběma, s jedním jménem jen tomu. Hodiny se berou z času začátku a konce, bez odečtu pauz. Oběd nebo svačina: „Lukáš oběd 400“ (zapíše se k zakázce, na které ten den měl hodiny).'),
     h('div', { class: 'row', style: { gap: '10px', alignItems: 'end', flexWrap: 'wrap' } }, h('div', null, h('label', { class: 'f' }, 'Kalendář'), calSel), go),
     status, queueBox);
   return box;

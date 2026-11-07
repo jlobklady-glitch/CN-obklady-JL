@@ -297,8 +297,14 @@ export async function saveQuote(q, force = false) {
   q.updated_at = data.updated_at;
   return data;
 }
-export async function newBezCN() {
-  const q = await newQuote();
+export async function newBezCN(code) {
+  let q;
+  if (code) {
+    const row = { number: code, issued_on: isoToday(), valid_days: S.firma.valid_days || 30, items: [], note: '', profile: S.profile };
+    const { data, error } = await sb.from('quotes').insert(row).select().single();
+    if (error) throw new Error(error.code === '23505' ? 'Zakázka s označením „' + code + '“ už existuje.' : error.message);
+    q = data;
+  } else q = await newQuote();
   q.settlement = { bez: true, items: [], advance: 0, note: '' };
   return saveQuote(q);
 }

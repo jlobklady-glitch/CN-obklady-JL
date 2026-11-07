@@ -1,6 +1,6 @@
 // Finální vyúčtování (k nabídce nebo bez CN) a faktury.
-import { h, kc, fmtDate, toast, confirmBox, makeSaver, parseNum, isoToday, addDays } from './util.js';
-import { S, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
+import { h, kc, fmtDate, toast, confirmBox, askText, makeSaver, parseNum, isoToday, addDays } from './util.js';
+import { S, loadRecords, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { openEmailDialog } from './email.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
@@ -14,12 +14,12 @@ export async function settlementsList(root) {
   const sorted = all.sort((a, b) => String((b.settlement.date) || b.issued_on).localeCompare(String(a.settlement.date || a.issued_on)));
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Vyúčtování'),
-      h('button', { class: 'btn gold', onclick: async () => { try { const n = await newBezCN(); location.hash = '#/vyuctovani/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, '+ Vyúčtování bez CN')),
+      h('button', { class: 'btn gold', onclick: async () => { try { const code = await askText('Označení zakázky (stejné pak píšete do kalendáře), např. Konzum 2026-1. Prázdné = automatické číslo.', 'Konzum 2026-1'); if (code === null) return; const n = await newBezCN(code); location.hash = '#/vyuctovani/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, '+ Vyúčtování bez CN')),
     h('p', { class: 'muted' }, 'Vyúčtování k nabídkám se vytváří v detailu nabídky tlačítkem „Vyúčtování“. Zde jsou všechna už vytvořená a můžete založit nové bez cenové nabídky.'),
     h('div', { class: 'tablewrap' }, h('table', { class: 't' },
       h('thead', null, h('tr', null, ['Nabídka', 'Datum', 'Odběratel', 'Stavba', 'Stav', 'Částka'].map((t, i) => h('th', { class: i === 5 ? 'r' : '' }, t)))),
       h('tbody', null, sorted.length ? sorted.map((r) => h('tr', { class: 'click', onclick: () => { location.hash = '#/vyuctovani/' + r.id; } },
-        h('td', null, h('b', null, r.settlement.bez ? '—' : r.number), r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null),
+        h('td', null, h('b', null, r.number), r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null),
         h('td', null, fmtDate(r.settlement.date || r.issued_on)), h('td', null, r.customer_name || '—'), h('td', null, r.project || ''),
         h('td', null, (() => { const s = settlementStatus(r, invs); return h('span', { class: 'badge ' + (s.key === 'fakturovano' || s.key === 'schvaleno' ? 'ok' : s.key === 'zaslano' ? 'gold' : '') }, s.label); })()),
         h('td', { class: 'r' }, kc(settlementTotals(r).actual)))) : h('tr', null, h('td', { colspan: 6, class: 'muted' }, 'Zatím žádné vyúčtování.'))))));
@@ -46,7 +46,33 @@ export async function settlementEditor(root, id) {
     sums.replaceChildren(...[(sp.hasWork || sp.hasMat) && line('Práce celkem (včetně dopravy)', kc(sp.work)), (sp.hasWork || sp.hasMat) && line('Materiál celkem', kc(sp.mat)), !bez && line(`Celkem dle nabídky ${q.number}`, kc(t.offer)), !bez && line('Rozdíl oproti nabídce', kc(t.diff)),
       t.advance ? line('Uhrazená záloha', kc(-t.advance)) : null, line(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due), true)].filter(Boolean));
   };
-  const touch = () => { saver.touch(); drawSums(); };
+  const intBox = h('div', { class: 'card' });
+  const n_ = (v) => Number(v) || 0;
+  const drawInternal = () => {
+    const key = (x) => String(x || '').trim().toLowerCase();
+    const mine = (r) => key(r.data.quote) === key(q.number);
+    const hrs = (S.rec.hours || []).filter(mine), cst = (S.rec.cost || []).filter(mine);
+    const rate = (r) => (r.data.rate !== undefined && r.data.rate !== '' ? n_(r.data.rate) : n_((S.firma.rates || {})[r.data.worker]));
+    const by = {};
+    for (const r of hrs) { const o = by[r.data.worker || '?'] = by[r.data.worker || '?'] || { h: 0, c: 0, rate: rate(r) }; o.h += n_(r.data.hours); o.c += n_(r.data.hours) * rate(r); if (o.rate !== rate(r)) o.rate = null; }
+    const work = Object.values(by).reduce((t, o) => t + o.c, 0), hours = Object.values(by).reduce((t, o) => t + o.h, 0);
+    const food = cst.filter((r) => /ob[eě]d|svač|svac/i.test(r.data.desc || '')), foodSum = food.reduce((t, r) => t + n_(r.data.amount), 0);
+    const other = cst.filter((r) => !food.includes(r)), otherSum = other.reduce((t, r) => t + n_(r.data.amount), 0);
+    const t = settlementTotals(q);
+    const line = (l, v, b) => h('div', { class: 'row between', style: { padding: '3px 0', fontWeight: b ? 800 : 400 } }, h('span', null, l), h('span', null, v));
+    intBox.replaceChildren(h('h2', null, 'Interní přehled zakázky (v dokladu se neukazuje)'),
+      hrs.length || cst.length ? h('div', null,
+        ...Object.entries(by).map(([w, o]) => line(`${w}: ${String(Math.round(o.h * 100) / 100).replace('.', ',')} h × ${o.rate === null ? 'různé sazby' : kc(o.rate) + '/h'}`, kc(o.c))),
+        line(`Práce celkem (${String(Math.round(hours * 100) / 100).replace('.', ',')} h)`, kc(work), true),
+        line(`Obědy a svačiny (${food.length}×)`, kc(foodSum)),
+        otherSum ? line('Ostatní náklady', kc(otherSum)) : null,
+        line('Vyúčtováno zákazníkovi', kc(t.actual)),
+        line('Po odečtení práce a jídla' + (otherSum ? ' i ostatních nákladů' : ''), kc(t.actual - work - foodSum - otherSum), true),
+        h('p', { class: 'muted' }, 'Rychlý přehled bez materiálu ze skladu. Celkový zisk najdete v Ziskovosti. Hodiny a obědy se sem načítají z Hodin a nákladů (ručně i z kalendáře) podle označení zakázky.'))
+        : h('p', { class: 'muted' }, `K označení „${q.number}“ zatím nejsou zapsané žádné hodiny ani náklady. Napište ho do nadpisu události v kalendáři a v Hodinách klikněte na „Načíst z kalendáře“.`));
+  };
+  Promise.all([loadRecords('hours'), loadRecords('cost')]).then(drawInternal).catch(() => {});
+  const touch = () => { saver.touch(); drawSums(); drawInternal(); };
   window.__flushSave = saver.flush; window.__isDirty = saver.isDirty;
   // Materiál MAPEI: ceníková cena + sleva pro zákazníka (volí se zde). Interní nákupní sleva z Nastavení se v dokladu nikdy neukazuje.
   const listOf = (r) => { const p = r.typ === 'mapei' && r.item_id ? S.prices.find((x) => x.id === r.item_id) : null; return p && Number(p.price) > 0 ? Number(p.price) / (Number(r.roll) || 1) : null; };
@@ -94,12 +120,12 @@ export async function settlementEditor(root, id) {
   const preview = h('div');
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: bez ? '#/vyuctovani' : '#/nabidka/' + q.id, class: 'btn ghost small' }, '← Zpět'),
-      h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
+      h('h1', null, 'Vyúčtování ' + q.number + (bez ? ' (bez CN)' : '')), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
       h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(q, { mode: 'settlement', beforeOpen: () => saver.flush(), onSent: async () => { if (!q.settlement.state || q.settlement.state === 'rozpracovane') { q.settlement.state = 'zaslano'; q.settlement.sent_at = isoToday(); stateSel.value = 'zaslano'; touch(); await saver.flush(); } } }) }, 'Poslat e-mailem'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
-    bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
+    bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje. Označení zakázky pro kalendář: ', h('b', null, q.number), ' ', h('input', { type: 'text', value: q.number, style: { width: '170px', marginLeft: '6px' }, onchange: (e) => { const v = e.target.value.trim(); if (v) { q.number = v; touch(); } } })) : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' }, fld('Stav vyúčtování', stateSel, ''), h('div', { class: 'muted', style: { alignSelf: 'end', paddingBottom: '8px' } }, 'Po vystavení faktury se stav změní na „Fakturováno“ sám.'))),
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
@@ -118,7 +144,7 @@ export async function settlementEditor(root, id) {
         } }, 'Použít na všechen materiál MAPEI'))),
     h('div', { class: 'card' }, h('h2', null, 'Skutečně provedené položky'), ed.box,
       h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: () => ed.add() }, '+ Přidat řádek'))),
-    sums,
+    sums, intBox,
     h('div', { class: 'card' }, fld('Poznámka', h('textarea', { oninput: bind(st, 'note') }, st.note || ''))),
     invBox, preview);
   drawSums();
