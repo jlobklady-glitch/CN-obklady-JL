@@ -1,6 +1,6 @@
 // Finální vyúčtování (k nabídce nebo bez CN) a faktury.
 import { h, kc, fmtDate, toast, confirmBox, askText, makeSaver, parseNum, isoToday, addDays } from './util.js';
-import { S, loadRecords, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
+import { S, MIN_DUE_DAYS, clampDue, loadRecords, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { openEmailDialog } from './email.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
@@ -107,7 +107,7 @@ export async function settlementEditor(root, id) {
         await saver.flush();
         const t = settlementTotals(q);
         try {
-          const inv = await createInvoice({ quote_id: q.id, profile: q.profile || S.profile, issued_on: isoToday(), taxable_on: (q.settlement && q.settlement.date) || isoToday(), due_on: addDays(isoToday(), S.firma.due_days || 14),
+          const inv = await createInvoice({ quote_id: q.id, profile: q.profile || S.profile, issued_on: isoToday(), taxable_on: (q.settlement && q.settlement.date) || isoToday(), due_on: addDays(isoToday(), Math.max(MIN_DUE_DAYS, S.firma.due_days || 14)),
             customer_name: q.customer_name, customer_address: q.customer_address,
             customer_ids: (() => { const c = S.contacts.find((x) => x.id === q.customer_id); return c && c.kind === 'PO' ? [c.ico && 'IČO ' + c.ico, c.dic && 'DIČ ' + c.dic].filter(Boolean).join(', ') : ''; })(),
             description: `${t.advance ? 'Doplatek – ' : ''}${q.project ? q.project : 'Obkladačské práce'}${bez ? '' : ' (dle nabídky ' + q.number + ')'}`, amount: t.due });
@@ -161,6 +161,8 @@ export async function invoiceEditor(root, id) {
   const touch = () => { isaver.touch(); draw(); };
   const sentIn = h('input', { type: 'date', value: inv.sent_at || '', oninput: (e) => { inv.sent_at = e.target.value || null; touch(); } });
   window.__flushSave = isaver.flush; window.__isDirty = isaver.isDirty;
+  const dueIn = h('input', { type: 'date', value: inv.due_on || '', oninput: (e) => { inv.due_on = e.target.value; touch(); }, onchange: () => fixDue(true) });
+  const fixDue = (warn) => { if (!inv.issued_on) return; const ok = clampDue(inv.issued_on, inv.due_on); if (ok !== inv.due_on) { inv.due_on = ok; dueIn.value = ok; touch(); if (warn) toast('Splatnost musí být nejdříve 3 dny po vystavení – upraveno.'); } };
   const bind = (k, num) => (e) => { inv[k] = num ? parseNum(e.target.value) : e.target.value; touch(); };
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
@@ -171,9 +173,9 @@ export async function invoiceEditor(root, id) {
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
       fld('Číslo faktury (= variabilní symbol)', h('input', { type: 'text', value: inv.number, oninput: bind('number') })),
-      fld('Datum vystavení', h('input', { type: 'date', value: inv.issued_on, oninput: bind('issued_on') })),
+      fld('Datum vystavení', h('input', { type: 'date', value: inv.issued_on, oninput: bind('issued_on'), onchange: () => fixDue() })),
       fld('Datum zdanitelného plnění', h('input', { type: 'date', value: inv.taxable_on || inv.issued_on, oninput: bind('taxable_on') })),
-      fld('Splatnost', h('input', { type: 'date', value: inv.due_on || '', oninput: bind('due_on') })),
+      fld('Splatnost (min. 3 dny po vystavení)', dueIn),
       fld('Odběratel', h('input', { type: 'text', value: inv.customer_name, oninput: bind('customer_name') })),
       fld('Adresa', h('input', { type: 'text', value: inv.customer_address, oninput: bind('customer_address') })),
       fld('IČO / DIČ', h('input', { type: 'text', value: inv.customer_ids, oninput: bind('customer_ids') })),
