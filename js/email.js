@@ -1,9 +1,10 @@
 // Odeslání nabídky e-mailem: profesionální HTML šablona s podpisem, odkazy na sítě a PDF v příloze.
 import { h, esc, kc, fmtDate, addDays, toast } from './util.js';
 import { S, firmaFor, quoteTotal } from './store.js';
-import { quoteDoc } from './doc.js';
+import { quoteDoc, settlementDoc, settlementTotals, splitTotals } from './doc.js';
 import { htmlToPdf, pdfName } from './pdf.js';
 import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.js';
+import { greeting } from './cs.js';
 import { czIban, spayd, qrGif, inquiryVs, PACKAGE_FEE, packageUrl } from './pay.js';
 
 const GOLD = '#b8975a', NAVY = '#22303C';
@@ -33,7 +34,7 @@ export function defaultSubject(q) {
 export function defaultMessage(q, f) {
   const validTo = fmtDate(addDays(q.issued_on, q.valid_days || f.valid_days || 30));
   return [
-    'Dobrý den,',
+    greeting(q.customer_name),
     '',
     `děkujeme za Váš zájem o naše služby. V příloze Vám zasíláme cenovou nabídku č. ${q.number}${q.project ? ' na akci „' + q.project + '“' : ''}.`,
     '',
@@ -108,12 +109,54 @@ export function buildHtml(q, f, message) {
   <div style="font-size:12px;color:#6b7580;padding-top:10px">Rozpis cenové nabídky najdete v přiložené nabídce (PDF).</div>`) + cta);
 }
 
+// ---- vyúčtování provedených prací ----
+const setLabel = (q) => (q.settlement && q.settlement.bez ? '' : q.number);
+export function settlementSubject(q) {
+  return `Vyúčtování provedených prací${setLabel(q) ? ' k nabídce ' + q.number : ''}${q.project ? ' – ' + q.project : ''}`;
+}
+export function settlementMessage(q) {
+  const t = settlementTotals(q);
+  return [
+    greeting(q.customer_name),
+    '',
+    `děkujeme za spolupráci. V příloze Vám zasíláme vyúčtování provedených prací${q.project ? ' na akci „' + q.project + '“' : ''}${setLabel(q) ? ' k nabídce č. ' + q.number : ''}.`,
+    '',
+    t.due < 0 ? `Uhrazená záloha ${kc(t.advance)} je vyšší než skutečná cena, přeplatek ${kc(-t.due)} Vám vrátíme.` : t.advance ? `Od celkové ceny je již odečtena uhrazená záloha ${kc(t.advance)}, k úhradě zbývá doplatek ${kc(t.due)}.` : `Celková cena k úhradě je ${kc(t.due)}.`,
+    'Dodavatel není plátcem DPH, ceny jsou konečné.',
+    '',
+    'V případě jakýchkoli dotazů se na nás neváhejte obrátit.',
+    '',
+    'S pozdravem',
+  ].join('\n');
+}
+export function buildSettlementText(q, f, message) {
+  const sig = [f.name, f.phone && 'tel. ' + f.phone, f.email, f.web, ...socials(f).filter(([n]) => n !== 'Web').map(([n, u]) => `${n}: ${u}`)].filter(Boolean);
+  return `${message}\n\n${sig.join('\n')}\n`;
+}
+export function buildSettlementHtml(q, f, message) {
+  const st = q.settlement || {};
+  const items = (st.items || []).filter((r) => r.name);
+  const t = settlementTotals(q), sp = splitTotals(items);
+  const summary = [
+    setLabel(q) ? rowHtml('K nabídce č.', q.number) : '',
+    q.project ? rowHtml('Akce', q.project) : '',
+    rowHtml('Datum vyúčtování', fmtDate(st.date || new Date().toISOString().slice(0, 10))),
+    sp.hasWork && sp.hasMat ? rowHtml('Práce (včetně dopravy)', kc(sp.work)) + rowHtml('Materiál', kc(sp.mat)) : '',
+    rowHtml('Celkem skutečně', kc(t.actual)),
+    t.advance ? rowHtml('Uhrazená záloha', kc(-t.advance)) : '',
+    t.due < 0 ? rowHtml('Přeplatek k vrácení', kc(-t.due)) : rowHtml(t.advance ? 'Doplatek k úhradě' : 'Celkem k úhradě', kc(t.due)),
+  ].join('');
+  return frame(f, `<tr><td style="padding:30px 32px 6px">${paraHtml(message)}</td></tr>` +
+    box(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${summary}</table>
+  <div style="font-size:12px;color:#6b7580;padding-top:10px">Položkový rozpis provedených prací najdete v přiloženém vyúčtování (PDF).</div>`));
+}
+
 // ---- platební údaje k objednané nabídce (QR platba) ----
 export const PAYMENT_FEE = PACKAGE_FEE;
 
 export function paymentMessage(r, f) {
   return [
-    'Dobrý den,',
+    greeting(r.name),
     '',
     'děkujeme za Vaši objednávku cenové nabídky. Níže zasíláme platební údaje.',
     '',
@@ -148,14 +191,18 @@ export function buildPaymentText(f, message, { amount, vs, account, iban }) {
 const arr = async (blob) => new Uint8Array(await blob.arrayBuffer());
 
 // Dialog pro odeslání nabídky. onSent se zavolá po úspěšném odeslání.
-export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
+export function openEmailDialog(q, { onSent, beforeOpen, mode } = {}) {
   const f = firmaFor(q);
+  const SET = mode === 'settlement';
+  const M = SET
+    ? { subject: settlementSubject, message: settlementMessage, html: buildSettlementHtml, text: buildSettlementText, doc: settlementDoc, label: pdfName('Vyúčtování ' + setLabel(q), q.customer_name), title: 'Odeslat vyúčtování e-mailem' }
+    : { subject: defaultSubject, message: (x) => defaultMessage(x, f), html: buildHtml, text: buildText, doc: quoteDoc, label: pdfName(q.number, q.customer_name), title: 'Odeslat nabídku e-mailem' };
   const c = S.contacts.find((x) => x.id === q.customer_id);
   const guess = (String(q.customer_contact || '').match(EMAIL_RE) || String((c && c.contact) || '').match(EMAIL_RE) || [''])[0];
   const to = h('input', { type: 'email', value: guess, placeholder: 'zakaznik@example.cz', autocomplete: 'off' });
-  const subj = h('input', { type: 'text', value: defaultSubject(q) });
-  const msg = h('textarea', { rows: 10, style: { width: '100%' } }, defaultMessage(q, f));
-  const pdfLabel = pdfName(q.number, q.customer_name);
+  const subj = h('input', { type: 'text', value: M.subject(q) });
+  const msg = h('textarea', { rows: 10, style: { width: '100%' } }, M.message(q));
+  const pdfLabel = M.label;
   const status = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
   const previewBox = h('div');
   const close = () => overlay.remove();
@@ -177,11 +224,11 @@ export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
       if (beforeOpen) await Promise.resolve(beforeOpen()).catch(() => {}); // uloží rozpracované změny
       await tok;
       status.textContent = 'Vytvářím PDF…';
-      const blob = await htmlToPdf(quoteDoc(q));
+      const blob = await htmlToPdf(M.doc(q));
       status.textContent = 'Odesílám e-mail…';
       const mime = buildMime({
-        to: addr, subject: subj.value.trim() || defaultSubject(q), replyTo: /^[^\s@]+@[^\s@]+$/.test(f.email || '') && !/[^\x20-\x7e]/.test(f.email) ? f.email : '',
-        text: buildText(q, f, msg.value), html: buildHtml(q, f, msg.value),
+        to: addr, subject: subj.value.trim() || M.subject(q), replyTo: /^[^\s@]+@[^\s@]+$/.test(f.email || '') && !/[^\x20-\x7e]/.test(f.email) ? f.email : '',
+        text: M.text(q, f, msg.value), html: M.html(q, f, msg.value),
         attachment: { name: pdfLabel, bytes: await arr(blob), type: 'application/pdf' },
       });
       await sendViaGmail(mime);
@@ -193,7 +240,7 @@ export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
 
   const preview = h('button', { class: 'btn ghost small', onclick: () => {
     const fr = h('iframe', { style: { width: '100%', height: '520px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff' } });
-    fr.srcdoc = buildHtml(q, f, msg.value);
+    fr.srcdoc = M.html(q, f, msg.value);
     previewBox.replaceChildren(fr);
   } }, 'Zobrazit náhled e-mailu');
 
@@ -202,11 +249,11 @@ export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
     e.target.disabled = true;
     try {
       status.textContent = 'Vytvářím PDF…';
-      const blob = await htmlToPdf(quoteDoc(q));
+      const blob = await htmlToPdf(M.doc(q));
       const a = h('a', { href: URL.createObjectURL(blob), download: pdfLabel });
       document.body.append(a); a.click(); a.remove();
       status.textContent = '';
-      const body = buildText(q, f, msg.value);
+      const body = M.text(q, f, msg.value);
       location.href = `mailto:${encodeURIComponent(to.value.trim())}?subject=${encodeURIComponent(subj.value)}&body=${encodeURIComponent(body)}`;
       toast('PDF je stažené, přiložte ho prosím k e-mailu.');
     } catch (er) { status.textContent = ''; toast(er.message, 'err'); }
@@ -215,7 +262,7 @@ export function openEmailDialog(q, { onSent, beforeOpen } = {}) {
 
   const overlay = h('div', { class: 'overlay', style: { alignItems: 'flex-start', overflowY: 'auto' } },
     h('div', { class: 'dialog', style: { maxWidth: '640px', margin: '12px auto' } },
-      h('h2', { style: { marginTop: 0 } }, 'Odeslat nabídku e-mailem'),
+      h('h2', { style: { marginTop: 0 } }, M.title),
       h('label', { class: 'f' }, 'Komu'), to,
       h('label', { class: 'f' }, 'Předmět'), subj,
       h('label', { class: 'f' }, 'Text e-mailu (podpis, odkazy na sítě a rekapitulaci doplníme automaticky)'), msg,

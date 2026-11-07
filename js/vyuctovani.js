@@ -2,6 +2,7 @@
 import { h, kc, fmtDate, toast, confirmBox, makeSaver, parseNum, isoToday, addDays } from './util.js';
 import { S, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
+import { openEmailDialog } from './email.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 import { settlementDoc, settlementTotals, splitTotals, invoiceDoc, printDoc } from './doc.js';
 
@@ -92,6 +93,7 @@ export async function settlementEditor(root, id) {
       h('h1', null, 'Vyúčtování ' + (bez ? '(bez CN)' : q.number)), state,
       h('button', { class: 'btn ghost small', onclick: () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: settlementDoc(q) })); preview.scrollIntoView({ behavior: 'smooth' }); } }, 'Náhled'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(settlementDoc(q), pdfName('Vyúčtování ' + (bez ? '' : q.number), q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),
+      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(q, { mode: 'settlement', beforeOpen: () => saver.flush() }) }, 'Poslat e-mailem'),
       h('button', { class: 'btn gold', onclick: async () => { await saver.flush(); printDoc(settlementDoc(q)); } }, 'PDF / Tisk')),
     bez ? h('div', { class: 'banner' }, 'Vyúčtování bez cenové nabídky – „Celkem dle nabídky“ se nezobrazuje.') : h('div', { class: 'banner' }, 'Vyúčtování je kopie nabídky – úpravy zde se do původní nabídky nepropisují.'),
     custCard,
