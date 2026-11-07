@@ -76,7 +76,7 @@ export async function settlementEditor(root, id) {
     const list = await listInvoices(q.id);
     invBox.replaceChildren(h('h2', null, 'Faktury'),
       list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', null, list.map((i) => h('tr', { class: 'click', onclick: () => { location.hash = '#/faktura/' + i.id; } },
-        h('td', null, h('b', null, i.number)), h('td', null, fmtDate(i.issued_on)), h('td', { class: 'r' }, kc(i.amount)), h('td', null, h('span', { class: 'badge ' + (i.paid ? 'ok' : 'gold') }, i.paid ? 'Zaplaceno' : 'Nezaplaceno'))))))) : h('p', { class: 'muted' }, 'Zatím žádná faktura.'),
+        h('td', null, h('b', null, i.number)), h('td', null, fmtDate(i.issued_on)), h('td', { class: 'r' }, kc(i.amount)), h('td', null, h('span', { class: 'badge ' + (i.paid ? 'ok' : 'gold') }, i.paid ? 'Zaplaceno' : 'Nezaplaceno'), i.sent_at ? h('span', { class: 'badge', style: { marginLeft: '4px' } }, 'Zasláno ' + fmtDate(i.sent_at)) : null)))))) : h('p', { class: 'muted' }, 'Zatím žádná faktura.'),
       h('div', { style: { marginTop: '10px' } }, h('button', { class: 'btn gold', onclick: async () => {
         await saver.flush();
         const t = settlementTotals(q);
@@ -133,13 +133,14 @@ export async function invoiceEditor(root, id) {
   const preview = h('div');
   const draw = () => { preview.replaceChildren(h('div', { class: 'preview-wrap', html: invoiceDoc(inv) })); };
   const touch = () => { isaver.touch(); draw(); };
+  const sentIn = h('input', { type: 'date', value: inv.sent_at || '', oninput: (e) => { inv.sent_at = e.target.value || null; touch(); } });
   window.__flushSave = isaver.flush; window.__isDirty = isaver.isDirty;
   const bind = (k, num) => (e) => { inv[k] = num ? parseNum(e.target.value) : e.target.value; touch(); };
   put(root,
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Faktura ' + inv.number), state,
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target, isaver.flush()); } }, 'PDF na Disk'),
-      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(inv, { mode: 'invoice', beforeOpen: () => isaver.flush() }) }, 'Poslat e-mailem'),
+      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(inv, { mode: 'invoice', beforeOpen: () => isaver.flush(), onSent: async () => { inv.sent_at = isoToday(); sentIn.value = inv.sent_at; touch(); await isaver.flush(); } }) }, 'Poslat e-mailem'),
       h('button', { class: 'btn gold', onclick: async () => { await isaver.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
@@ -151,6 +152,7 @@ export async function invoiceEditor(root, id) {
       fld('Adresa', h('input', { type: 'text', value: inv.customer_address, oninput: bind('customer_address') })),
       fld('IČO / DIČ', h('input', { type: 'text', value: inv.customer_ids, oninput: bind('customer_ids') })),
       fld('Částka (Kč)', h('input', { type: 'text', inputmode: 'decimal', value: inv.amount, oninput: bind('amount', true) })),
+      fld('Zasláno zákazníkovi', sentIn),
       fld('Stav', h('select', { onchange: (e) => { inv.paid = e.target.value === '1'; touch(); } }, h('option', { value: '0', selected: !inv.paid }, 'Nezaplaceno'), h('option', { value: '1', selected: inv.paid }, 'Zaplaceno'))),
       fld('Popis', h('textarea', { oninput: bind('description') }, inv.description || ''), 'span3'))),
     h('div', { class: 'row end', style: { marginBottom: '12px' } }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('Smazat fakturu ' + inv.number + '?')) { try { await deleteInvoice(inv.id); } catch (e) { return toast(e.message, 'err'); } isaver.stop(); window.__flushSave = null; window.__isDirty = null; location.hash = inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky'; } } }, 'Smazat')),
