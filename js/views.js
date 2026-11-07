@@ -1,5 +1,5 @@
 // Kontakty, ceníky, nastavení.
-import { h, kc, matcher, toast, confirmBox, parseNum } from './util.js';
+import { h, kc, matcher, toast, confirmBox, parseNum, fmtDate, addDays, isoToday } from './util.js';
 import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
 import { importButtons } from './cenikimport.js';
@@ -128,6 +128,51 @@ export function pricesView(root) {
   drawSub(); draw();
 }
 
+// Propojení s bankou Fio (jen čtení): token se uloží na server, aplikace ho zpět nikdy nevidí.
+function bankCard() {
+  const box = h('div', { class: 'card' });
+  const label = ((S.firmaBase.profiles || {})[S.profile] || {}).label || S.profile || '';
+  const tok = h('input', { type: 'password', autocomplete: 'off', placeholder: 'vložte token (64 znaků)', style: { width: '100%' } });
+  const exp = h('input', { type: 'date', value: addDays(isoToday(), 175) });
+  const msg = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
+  const draw = async () => {
+    const [st, pays] = await Promise.all([
+      sb.from('bank_status').select('*').eq('profile', S.profile).maybeSingle(),
+      sb.from('bank_payments').select('*').order('paid_on', { ascending: false }).order('created_at', { ascending: false }).limit(15),
+    ]);
+    const s = st.data;
+    const when = s && s.last_run ? new Date(s.last_run).toLocaleString('cs-CZ') : '–';
+    box.replaceChildren(
+      h('h2', null, 'Platby z banky (Fio)'),
+      h('p', { class: 'muted' }, 'Aplikace jednou za hodinu zkontroluje příchozí platby na účtu a podle variabilního symbolu označí zaplacenou fakturu nebo balíček. Pošle upozornění do telefonu. Token slouží jen ke čtení, peníze s ním posílat nejde. V Fio bankovnictví: Nastavení → API → nový token, typ „Sledování účtu“, platnost nejvýše 180 dní.'),
+      h('p', null, h('b', null, 'Profil ' + label + ': '), s ? `propojeno · poslední kontrola ${when} · ${s.last_status || ''}${s.expires_on ? ' · token platí do ' + fmtDate(s.expires_on) : ''}` : 'zatím nepropojeno'),
+      h('div', { class: 'grid c2' }, h('div', null, h('label', { class: 'f' }, 'Fio token (jen ke čtení)'), tok), h('div', null, h('label', { class: 'f' }, 'Token platí do'), exp)),
+      h('div', { class: 'row', style: { marginTop: '10px', gap: '8px', flexWrap: 'wrap' } },
+        h('button', { class: 'btn gold', onclick: async (e) => {
+          if (!S.profile) return toast('Nejdřív zvolte profil.', 'err');
+          e.target.disabled = true;
+          try { const { error } = await sb.rpc('set_bank_token', { p_profile: S.profile, p_token: tok.value, p_expires: exp.value || null }); if (error) throw error; tok.value = ''; toast('Token uložen'); await check(); }
+          catch (er) { toast(er.message, 'err'); } e.target.disabled = false; } }, 'Uložit token a zkontrolovat'),
+        s ? h('button', { class: 'btn ghost', onclick: async (e) => { e.target.disabled = true; await check(); e.target.disabled = false; } }, 'Zkontrolovat platby teď') : null,
+        s ? h('button', { class: 'btn ghost', onclick: async () => { if (await confirmBox('Odpojit banku a smazat uložený token?')) { await sb.rpc('delete_bank_token', { p_profile: S.profile }); draw(); } } }, 'Odpojit') : null),
+      msg,
+      pays.data && pays.data.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' },
+        h('thead', null, h('tr', null, ['Datum', 'Od koho', 'VS', 'Částka', 'Spárováno'].map((t, i) => h('th', { class: i === 3 ? 'r' : '' }, t)))),
+        h('tbody', null, pays.data.map((p) => h('tr', null, h('td', null, fmtDate(p.paid_on)), h('td', null, p.counter_name || p.counter_account || ''), h('td', null, p.vs || ''), h('td', { class: 'r' }, kc(p.amount)),
+          h('td', null, p.match_label ? h('span', { class: 'badge ' + (/zaplacen/.test(p.match_label) ? 'ok' : 'gold') }, p.match_label) : h('span', { class: 'muted' }, 'nespárováno'))))))) : null);
+  };
+  const check = async () => {
+    msg.textContent = 'Kontroluji platby…';
+    const { data, error } = await sb.functions.invoke('fio-sync', { body: {} });
+    if (error) { msg.textContent = 'Chyba: ' + error.message; return; }
+    const r = (data && data.results || []).find((x) => x.profile === S.profile) || {};
+    msg.textContent = r.error ? r.error : `Hotovo: nových plateb ${r.fresh ?? 0}, spárováno ${r.matched ?? 0}.`;
+    draw().then(() => { /* stav obnoven */ });
+  };
+  draw().catch((er) => { box.replaceChildren(h('h2', null, 'Platby z banky (Fio)'), h('p', { class: 'muted' }, 'Nelze načíst: ' + er.message)); });
+  return box;
+}
+
 export function settingsView(root) {
   const f = JSON.parse(JSON.stringify(S.firmaBase));
   let orig = JSON.parse(JSON.stringify(S.firmaBase));
@@ -184,6 +229,7 @@ export function settingsView(root) {
         const { error } = await sb.auth.updateUser({ password: pw.value });
         if (error) toast(error.message, 'err'); else { pw.value = ''; toast('Heslo změněno'); } } }, 'Změnit heslo'))),
     pushCard(),
+    bankCard(),
     h('div', { class: 'card' }, h('h2', null, 'Záloha dat'),
       h('p', { class: 'muted' }, 'Uloží všechno (nabídky, vyúčtování, faktury, kontakty, ceníky, sklad, hodiny) do jednoho souboru. V telefonu zvolte „Uložit na Disk“, na počítači se soubor stáhne. Doporučeno aspoň jednou týdně.'),
       h('div', { class: 'row' },
