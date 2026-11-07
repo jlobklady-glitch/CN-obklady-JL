@@ -169,6 +169,15 @@ export async function patchPrice(p, k, v) {
   const i = S.prices.findIndex((x) => x.id === data.id); if (i >= 0) S.prices[i] = data;
   Object.assign(p, data);
 }
+// uložení pole do extra (např. vlastní nákupní sleva položky)
+export async function patchPriceExtra(p, patch) {
+  const extra = { ...(p.extra || {}), ...patch };
+  for (const k of Object.keys(extra)) if (extra[k] === null || extra[k] === undefined || extra[k] === '') delete extra[k];
+  const { data, error } = await sb.from('price_items').update({ extra }).eq('id', p.id).select().single();
+  if (error) throw error;
+  const i = S.prices.findIndex((x) => x.id === data.id); if (i >= 0) S.prices[i] = data;
+  Object.assign(p, data);
+}
 export async function savePrice(p) {
   const row = { category: p.category, code: p.code || '', name: p.name, unit: p.unit || '', price: parseNum(p.price), pack: parseNum(p.pack) || 1, extra: p.extra || {}, active: p.active !== false };
   let res;
@@ -195,7 +204,11 @@ export function kabeTier(item, qty) {
 
 export function priceFor(item, qty) {
   const f = S.firma;
-  if (item.category === 'mapei') return Math.round(item.price * (1 - (Number(f.mapei_discount) || 0)) * 100) / 100;
+  if (item.category === 'mapei') { // vlastní nákupní sleva položky (z ceníku) má přednost před výchozí z Nastavení
+    const own = item.extra && item.extra.buy_disc !== undefined && item.extra.buy_disc !== '' ? Number(item.extra.buy_disc) : NaN;
+    const d = Number.isFinite(own) ? own : Number(f.mapei_discount) || 0;
+    return Math.round(item.price * (1 - d) * 100) / 100;
+  }
   if (item.category === 'kabe') return Math.round(kabeTier(item, qty) * (1 + (Number(f.kabe_markup) || 0)));
   return Number(item.price) || 0;
 }

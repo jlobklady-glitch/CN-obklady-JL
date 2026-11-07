@@ -4,7 +4,7 @@ import { makeBackup, restoreBackup, backupToDrive } from './backup.js';
 import { driveReady } from './drive.js';
 import { importButtons } from './cenikimport.js';
 import { pushCard } from './push.js';
-import { renameWorkerRecords, patchPrice, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
+import { renameWorkerRecords, patchPrice, patchPriceExtra, saveFirmaMerged, S, DEFAULT_QA, TYPES, typeLabel, saveContact, deleteContact, savePrice, deletePrice, saveFirma, importSeed, sb, loadAll } from './store.js';
 
 export function contactsView(root) {
   let q = '';
@@ -93,6 +93,9 @@ export function pricesView(root) {
       return h('div', { class: 'pr' },
         h('div', { class: 'pf pn' }, h('label', { class: 'f' }, 'Název'), ta, note ? h('div', { class: 'muted', style: { fontSize: '12px', marginTop: '2px' } }, note) : null),
         h('div', { class: 'pr-small' }, small(p, 'code', 'Kód'), small(p, 'unit', 'MJ'), p.category === 'mapei' ? small(p, 'pack', 'Balení') : null, small(p, 'price', 'Cena (Kč)'),
+          p.category === 'mapei' ? h('div', { class: 'pf' }, h('label', { class: 'f', title: 'Vaše nákupní sleva na tuto položku podle faktury dodavatele. Prázdné = výchozí sleva z Nastavení. V dokladech pro zákazníka se neukazuje.' }, 'Nákup. sleva %'),
+            h('input', { type: 'text', inputmode: 'decimal', placeholder: String(Math.round((Number(S.firma.mapei_discount) || 0) * 1000) / 10).replace('.', ','), value: (p.extra || {}).buy_disc !== undefined ? Math.round(Number(p.extra.buy_disc) * 1000) / 10 : '',
+              onchange: async (e) => { const t = e.target.value.trim(); try { await patchPriceExtra(p, { buy_disc: t === '' ? null : Math.min(Math.max(parseNum(t), 0), 100) / 100 }); toast('Uloženo'); } catch (er) { toast(er.message, 'err'); } } })) : null,
           h('button', { class: 'del', title: 'Smazat', onclick: async () => { if (await confirmBox('Smazat položku?')) { await deletePrice(p.id); drawSub(); draw(); } } }, '×')));
     };
     const list = []; let lastS = null, lastG = null;
@@ -163,7 +166,7 @@ export function settingsView(root) {
       fld('Telefon', pinp('phone')), fld('E-mail', pinp('email')), fld('Číslo účtu', pinp('account')), fld('Banka', pinp('bank')),
       fld('Instagram (odkaz)', inp('instagram')), fld('YouTube (odkaz)', inp('youtube')), fld('Facebook (odkaz)', inp('facebook')), fld('Slogan v záhlaví', inp('tagline'), 'span2'),
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
-      fld('Sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
+      fld('Výchozí nákupní sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
       fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; } }, f.terms || ''), 'span2')),
       h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Pracovníci a hodinové sazby'), workersBox,
