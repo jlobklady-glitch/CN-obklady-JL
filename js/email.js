@@ -1,7 +1,7 @@
 // Odeslání nabídky e-mailem: profesionální HTML šablona s podpisem, odkazy na sítě a PDF v příloze.
 import { h, esc, kc, fmtDate, addDays, toast } from './util.js';
 import { S, firmaFor, quoteTotal } from './store.js';
-import { quoteDoc, settlementDoc, settlementTotals, splitTotals } from './doc.js';
+import { quoteDoc, settlementDoc, invoiceDoc, settlementTotals, splitTotals } from './doc.js';
 import { htmlToPdf, pdfName } from './pdf.js';
 import { gmailReady, ensureGmailToken, buildMime, sendViaGmail } from './gmail.js';
 import { greeting } from './cs.js';
@@ -150,6 +150,48 @@ export function buildSettlementHtml(q, f, message) {
   <div style="font-size:12px;color:#6b7580;padding-top:10px">Položkový rozpis provedených prací najdete v přiloženém vyúčtování (PDF).</div>`));
 }
 
+// ---- faktura ----
+export const invoiceSubject = (i) => `Faktura č. ${i.number}${i.description ? ' – ' + String(i.description).split('\n')[0].slice(0, 60) : ''}`;
+export function invoiceMessage(i) {
+  return [
+    greeting(i.customer_name),
+    '',
+    'děkujeme za spolupráci. V příloze Vám zasíláme fakturu za provedené práce.',
+    '',
+    'Platební údaje najdete níže, platbu můžete provést i načtením QR kódu v mobilním bankovnictví.',
+    '',
+    'V případě jakýchkoli dotazů se na nás neváhejte obrátit.',
+    '',
+    'S pozdravem',
+  ].join('\n');
+}
+const invInfo = (i, f) => ({ amount: Number(i.amount) || 0, vs: i.number, account: String(f.account || '').trim(), iban: czIban(String(f.account || '').trim()) });
+export function buildInvoiceHtml(i, f, message) {
+  const inf = invInfo(i, f);
+  const qrOk = !!(inf.iban && inf.amount > 0) && !i.paid;
+  const rows = [
+    rowHtml('Číslo faktury', i.number),
+    rowHtml('Datum splatnosti', fmtDate(i.due_on)),
+    rowHtml('Částka k úhradě', kc(inf.amount)),
+    rowHtml('Číslo účtu', inf.account),
+    inf.iban ? rowHtml('IBAN', inf.iban) : '',
+    rowHtml('Variabilní symbol', inf.vs),
+    rowHtml('Příjemce', f.name || 'JL-OBKLADY'),
+  ].join('');
+  const qr = qrOk ? `<div style="text-align:center;padding:14px 0 4px"><img src="cid:qrplatba" width="190" height="190" alt="QR platba" style="border:0;display:inline-block"><div style="font-size:12px;color:#6b7580;padding-top:6px">Naskenujte v mobilním bankovnictví</div></div>` : '';
+  return frame(f, `<tr><td style="padding:30px 32px 6px">${paraHtml(message)}</td></tr>` +
+    box(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>${qr}
+  <div style="font-size:13px;font-weight:bold;color:${NAVY};padding-top:12px">Před odesláním platby prosím zkontrolujte číslo účtu, částku a variabilní symbol.</div>
+  <div style="font-size:12px;color:#6b7580;padding-top:8px">Dodavatel není plátcem DPH. Fakturu v PDF najdete v příloze.</div>`));
+}
+export function buildInvoiceText(i, f, message) {
+  const inf = invInfo(i, f);
+  const lines = [`Číslo faktury: ${i.number}`, `Datum splatnosti: ${fmtDate(i.due_on)}`, `Částka k úhradě: ${kc(inf.amount)}`, `Číslo účtu: ${inf.account}`, inf.iban && `IBAN: ${inf.iban}`, `Variabilní symbol: ${inf.vs}`, '', 'Před odesláním platby prosím zkontrolujte číslo účtu, částku a variabilní symbol.'];
+  const sig = [f.name, f.phone && 'tel. ' + f.phone, f.email, f.web, ...socials(f).filter(([n]) => n !== 'Web').map(([n, u]) => `${n}: ${u}`)].filter(Boolean);
+  return `${message}\n\n${lines.filter((x) => x !== undefined && x !== false && x !== null).join('\n')}\n\n${sig.join('\n')}\n`;
+}
+const invQrGif = (i, f) => { const inf = invInfo(i, f); return inf.iban && inf.amount > 0 && !i.paid ? qrGif(spayd({ account: inf.account, amount: inf.amount, vs: inf.vs, msg: 'Faktura ' + i.number })) : null; };
+
 // ---- platební údaje k objednané nabídce (QR platba) ----
 export const PAYMENT_FEE = PACKAGE_FEE;
 
@@ -192,11 +234,13 @@ const arr = async (blob) => new Uint8Array(await blob.arrayBuffer());
 // Dialog pro odeslání nabídky. onSent se zavolá po úspěšném odeslání.
 export function openEmailDialog(q, { onSent, beforeOpen, mode } = {}) {
   const f = firmaFor(q);
-  const SET = mode === 'settlement';
-  const M = SET
+  const SET = mode === 'settlement', INV = mode === 'invoice';
+  const M = INV
+    ? { subject: invoiceSubject, message: invoiceMessage, html: buildInvoiceHtml, text: buildInvoiceText, doc: invoiceDoc, label: pdfName('Faktura ' + q.number, q.customer_name), title: 'Odeslat fakturu e-mailem' }
+    : SET
     ? { subject: settlementSubject, message: settlementMessage, html: buildSettlementHtml, text: buildSettlementText, doc: settlementDoc, label: pdfName('Vyúčtování ' + setLabel(q), q.customer_name), title: 'Odeslat vyúčtování e-mailem' }
     : { subject: defaultSubject, message: (x) => defaultMessage(x, f), html: buildHtml, text: buildText, doc: quoteDoc, label: pdfName(q.number, q.customer_name), title: 'Odeslat nabídku e-mailem' };
-  const c = S.contacts.find((x) => x.id === q.customer_id);
+  const c = S.contacts.find((x) => x.id === q.customer_id) || (INV ? S.contacts.find((x) => x.name === q.customer_name) : null);
   const guess = (String(q.customer_contact || '').match(EMAIL_RE) || String((c && c.contact) || '').match(EMAIL_RE) || [''])[0];
   const to = h('input', { type: 'email', value: guess, placeholder: 'zakaznik@example.cz', autocomplete: 'off' });
   const subj = h('input', { type: 'text', value: M.subject(q) });
@@ -229,6 +273,7 @@ export function openEmailDialog(q, { onSent, beforeOpen, mode } = {}) {
         to: addr, subject: subj.value.trim() || M.subject(q), replyTo: /^[^\s@]+@[^\s@]+$/.test(f.email || '') && !/[^\x20-\x7e]/.test(f.email) ? f.email : '',
         text: M.text(q, f, msg.value), html: M.html(q, f, msg.value),
         attachment: { name: pdfLabel, bytes: await arr(blob), type: 'application/pdf' },
+        inline: INV && invQrGif(q, f) ? { cid: 'qrplatba', bytes: invQrGif(q, f), type: 'image/gif', name: 'qr-platba.gif' } : null,
       });
       await sendViaGmail(mime);
       toast('E-mail odeslán na ' + addr);
@@ -239,7 +284,10 @@ export function openEmailDialog(q, { onSent, beforeOpen, mode } = {}) {
 
   const preview = h('button', { class: 'btn ghost small', onclick: () => {
     const fr = h('iframe', { style: { width: '100%', height: '520px', border: '1px solid #ddd', borderRadius: '6px', background: '#fff' } });
-    fr.srcdoc = M.html(q, f, msg.value);
+    let html = M.html(q, f, msg.value);
+    const gif = INV ? invQrGif(q, f) : null;
+    if (gif) { let b = ''; gif.forEach((x) => { b += String.fromCharCode(x); }); html = html.replace('cid:qrplatba', 'data:image/gif;base64,' + btoa(b)); }
+    fr.srcdoc = html;
     previewBox.replaceChildren(fr);
   } }, 'Zobrazit náhled e-mailu');
 

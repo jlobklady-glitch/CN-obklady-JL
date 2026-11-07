@@ -139,6 +139,7 @@ export async function invoiceEditor(root, id) {
     h('div', { class: 'pagehead' }, h('a', { href: inv.quote_id ? '#/vyuctovani/' + inv.quote_id : '#/nabidky', class: 'btn ghost small' }, '← Zpět'),
       h('h1', null, 'Faktura ' + inv.number), state,
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(invoiceDoc(inv), pdfName('Faktura ' + inv.number, inv.customer_name), e.target, isaver.flush()); } }, 'PDF na Disk'),
+      h('button', { class: 'btn ghost small', onclick: () => openEmailDialog(inv, { mode: 'invoice', beforeOpen: () => isaver.flush() }) }, 'Poslat e-mailem'),
       h('button', { class: 'btn gold', onclick: async () => { await isaver.flush(); printDoc(invoiceDoc(inv)); } }, 'PDF / Tisk')),
     !S.firma.account ? h('div', { class: 'banner' }, 'Vyplňte číslo účtu v Nastavení – bez něj nelze vytvořit QR platbu.') : null,
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
