@@ -3,6 +3,7 @@ import { h, kc, num } from './util.js';
 import { S, loadRecords } from './store.js';
 import { recordsList } from './records.js';
 import { PAYERS, stockCalc } from './sklad.js';
+import { calendarPanel, calendarReady } from './kalendar.js';
 
 const n = (v) => Number(v) || 0;
 const rateOf = (name) => n((S.firma.rates || {})[name]);
@@ -44,10 +45,21 @@ export async function hodinyView(root) {
   const costs = recordsList({ kind: 'cost', addLabel: '+ Nový náklad', onChange: drawSum,
     fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN) – nebo prázdné', type: 'text' }, { k: 'desc', label: 'Popis (oběd, doprava, nářadí…)', type: 'text', wide: true },
       { k: 'payer', label: 'Kdo platil', type: 'select', options: PAYERS }, { k: 'amount', label: 'Částka (Kč)', type: 'num' }, { k: 'reimbursed', label: 'Proplaceno (Kč)', type: 'num' }] });
+  const cal = calendarReady() ? calendarPanel(() => { hours.redraw(); costs.redraw(); drawSum(); }) : null;
+  const byQuote = () => {
+    const m = {};
+    for (const r of S.rec.hours || []) { const k = r.data.quote || '(bez zakázky)'; const o = m[k] = m[k] || { h: 0, c: 0, l: 0 }; o.h += n(r.data.hours); o.c += n(r.data.hours) * rowRate(r); }
+    for (const r of S.rec.cost || []) if (/ob[eě]d/i.test(r.data.desc || '')) { const k = r.data.quote || '(bez zakázky)'; const o = m[k] = m[k] || { h: 0, c: 0, l: 0 }; o.l += n(r.data.amount); }
+    const rows = Object.entries(m).sort((a, b) => b[0].localeCompare(a[0], 'cs'));
+    return h('div', { class: 'card' }, h('h2', null, 'Hodiny podle zakázek'),
+      h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Zakázka', 'Hodin', 'Náklad práce', 'Obědy'].map((x, i) => h('th', { class: i ? 'r' : '' }, x)))),
+        h('tbody', null, rows.length ? rows.map(([k, o]) => h('tr', null, h('td', null, h('b', null, k)), h('td', { class: 'r' }, num(o.h)), h('td', { class: 'r' }, kc(o.c)), h('td', { class: 'r' }, kc(o.l)))) : h('tr', null, h('td', { colspan: 4, class: 'muted' }, 'Zatím žádné hodiny.'))))),
+      h('p', { class: 'muted' }, 'Průběžný stav všech zapsaných hodin (ručně i z kalendáře). Zisk zakázky najdete v Ziskovosti.'));
+  };
   const tabs = h('div', { class: 'tabsrow' });
   const show = () => {
-    tabs.replaceChildren(...[['vyr', 'Vyrovnání'], ['h', 'Hodiny'], ['c', 'Ostatní náklady']].map(([k, l]) => h('button', { class: 'btn small ' + (tab === k ? '' : 'ghost'), onclick: () => { tab = k; show(); } }, l)));
-    body.replaceChildren(tab === 'h' ? hours.el : tab === 'c' ? costs.el : sum);
+    tabs.replaceChildren(...[['vyr', 'Vyrovnání'], ['z', 'Podle zakázek'], ['h', 'Hodiny'], ['c', 'Ostatní náklady']].map(([k, l]) => h('button', { class: 'btn small ' + (tab === k ? '' : 'ghost'), onclick: () => { tab = k; show(); } }, l)));
+    body.replaceChildren(...(tab === 'h' ? [cal, hours.el].filter(Boolean) : tab === 'c' ? [costs.el] : tab === 'z' ? [byQuote()] : [sum]));
     if (tab === 'vyr') drawSum();
   };
   root.replaceChildren(h('div', { class: 'pagehead' }, h('h1', null, 'Hodiny a náklady')), tabs, body);

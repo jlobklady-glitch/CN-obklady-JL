@@ -7,7 +7,7 @@ let client = null, token = null, tokenExp = 0;
 
 export const gmailReady = () => !!GOOGLE_CLIENT_ID;
 
-function loadGsi() {
+export function loadGsi() {
   if (window.google && window.google.accounts) return Promise.resolve();
   return new Promise((res, rej) => {
     const s = document.createElement('script');
