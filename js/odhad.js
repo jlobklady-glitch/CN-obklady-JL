@@ -96,9 +96,10 @@ export function draftFromRooms(rooms) {
         P.A = q2(r.wallLen * r.wallH);
         const zw = zoneWalls(r);
         P.test = false;
-        if (r.waterproof && r.hydroWalls === 'cele') { P.wet = true; P.wallBm = r.wallLen; P.wetH = Math.max(r.wallH, 2); }
+        if (r.waterproof && r.hydroWalls === 'cele') { P.wet = true; P.wallBm = r.wallLen; P.wetH = Math.max(r.wallH, 2); P.fullWalls = true; }
         else if (r.waterproof && zw.bm > 0) { P.wet = true; P.wallBm = zw.bm; P.wetH = 2; P.zoneWalls = true; }
         else { P.wet = false; }
+        if (r.niche) { P.niche = true; P.nicheN = Math.max(Number(r.nicheN) || 1, 1); P.nicheW = Number(r.nicheW) || 30; P.nicheH = Number(r.nicheH) || 60; P.nicheD = Number(r.nicheD) || 10; P.nicheEdge = 'lista'; if (r.waterproof) P.wet = true; }
         const sec = { title: `${lab} – stěny`, inputs: `obklad stěn: obvod ${cz(r.wallLen)} m × výška ${cz(r.wallH)} m = ${cz(P.A)} m²; formát ${P.fa}×${P.fb} cm${r.format === 'nevim' ? ' (zadáno „nevím“, počítáno jako 60×60)' : ''}; spára ${P.joint} mm; rezerva materiálu ${P.reserve} %; hydroizolace stěn ${P.wet ? (r.hydroWalls === 'cele' ? 'všechny obkládané stěny, výška ' + cz(P.wetH) + ' m' : 'zóny ' + zw.parts.map((x) => x[0] + ' = ' + cz(x[1]) + ' m').join('; ') + '; výška 2 m') : 'ne'}`, lines: [] };
         sections.push(sec); take(P, sec); demoA += P.A;
       } else notes.push(`${lab}: v ceníku chybí položka pokládky obkladu`);
