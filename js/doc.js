@@ -153,7 +153,8 @@ export function invoiceDoc(inv) {
         <div>Částka: <b>${kc(inv.amount)}</b> · splatnost: <b>${fmtDate(inv.due_on)}</b></div>
         ${inv.paid ? '<div style="color:var(--ok);font-weight:800;margin-top:2mm">ZAPLACENO</div>' : ''}</div>
       <div style="width:34mm;height:34mm">${qr}</div></div>
-    <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci. Před odesláním platby zkontrolujte v bance číslo účtu, částku a variabilní symbol.</div>${footer()}</div></div>`;
+    <div style="margin-top:4mm;padding:2.5mm 3mm;border:1.5px solid var(--ink);border-radius:2mm;background:var(--sand);font-weight:800;font-size:10.5pt">Před odesláním platby si prosím zkontrolujte číslo účtu, částku a variabilní symbol.</div>
+    <div class="small">Dodavatel není plátcem DPH. Fakturu lze uhradit načtením QR kódu v bankovní aplikaci.</div>${footer()}</div></div>`;
 }
 
 // Mezisoučty práce a materiálu (jen když nabídka obsahuje obojí)
