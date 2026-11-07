@@ -1,6 +1,6 @@
 // Hodiny, ostatní náklady a vyrovnání s pracovníky.
-import { h, kc, num } from './util.js';
-import { S, loadRecords } from './store.js';
+import { h, kc, num, toast } from './util.js';
+import { S, loadRecords, addRecord, saveRecord } from './store.js';
 import { recordsList } from './records.js';
 import { PAYERS, stockCalc } from './sklad.js';
 import { calendarPanel, calendarReady } from './kalendar.js';
@@ -40,7 +40,8 @@ export async function hodinyView(root) {
   };
   const hInfo = (r) => `Náklad práce: ${kc(n(r.data.hours) * rowRate(r))} (sazba ${num(rowRate(r))} Kč/hod)`;
   const hours = recordsList({ kind: 'hours', addLabel: '+ Nové hodiny', onChange: drawSum, rowInfo: hInfo,
-    fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN)', type: 'text' }, { k: 'worker', label: 'Pracovník', type: 'select', options: PAYERS },
+    fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN)', type: 'text' }, { k: 'worker', label: 'Pracovník', type: 'select', options: () => [...PAYERS(), ...(PAYERS().length > 1 ? ['Oba'] : [])],
+        onPick: async (r, v) => { if (v !== 'Oba') return false; const ws = PAYERS(); r.data.worker = ws[0]; await saveRecord(r); for (const w of ws.slice(1)) await addRecord('hours', { ...r.data, worker: w, gcal_id: undefined, gcal_hours: undefined }, r.rec_date); toast('Hodiny zapsány oběma (vytvořen záznam pro každého).'); return true; } },
       { k: 'hours', label: 'Hodin', type: 'num' }, { k: 'rate', label: 'Sazba (jen když se liší)', type: 'num' }, { k: 'paid', label: 'Vyplaceno (Kč)', type: 'num' }] });
   const costs = recordsList({ kind: 'cost', addLabel: '+ Nový náklad', onChange: drawSum,
     fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN) – nebo prázdné', type: 'text' }, { k: 'desc', label: 'Popis (oběd, doprava, nářadí…)', type: 'text', wide: true },

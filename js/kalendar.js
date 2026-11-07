@@ -100,7 +100,11 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const quote = findQuote(title, quotes);
     const hrs = eventHours(ev);
     if (!quote || hrs === null) {
-      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w))) res.queue.push({ ev, id: ev.id, title, date, who, hours: hrs, quote: quote ? quote.number : '', kind: 'hours' });
+      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w))) {
+        const allDay = !!(ev.start && ev.start.date);
+        const why = [!quote && 'v nadpisu nebylo nalezeno číslo ani označení žádné zakázky', hrs === null && (allDay ? 'celodenní událost – doplňte hodiny (předvyplněno 8)' : 'nelze určit délku události')].filter(Boolean).join('; ');
+        res.queue.push({ ev, id: ev.id, title, date, who, all: who.length === workers.length && workers.length > 1, hours: hrs === null && allDay ? 8 : hrs, quote: quote ? quote.number : '', kind: 'hours', note: why });
+      }
       continue;
     }
     for (const w of who) {
@@ -146,24 +150,27 @@ export function calendarPanel(onChange) {
     const rows = queue.map((it) => {
       const qIn = h('input', { type: 'text', list: 'gcalq', value: it.quote, placeholder: 'č. nabídky', style: { width: '120px' } });
       const hIn = h('input', { type: 'text', inputmode: 'decimal', value: it.kind === 'lunch' ? it.amount || '' : it.hours ?? '', placeholder: it.kind === 'lunch' ? 'Kč' : 'hodin', style: { width: '70px' } });
-      const wSel = it.kind === 'lunch' ? h('select', null, h('option', { value: '' }, 'kdo?'), PAYERS().map((w) => h('option', { selected: it.who[0] === w }, w))) : null;
+      const wSel = it.kind === 'lunch' ? h('select', null, h('option', { value: '' }, 'kdo?'), PAYERS().map((w) => h('option', { selected: it.who[0] === w }, w)))
+        : h('select', null, ...(PAYERS().length > 1 ? [h('option', { value: '*', selected: !!it.all }, 'Oba')] : []), PAYERS().map((w) => h('option', { value: w, selected: !it.all && it.who[0] === w }, w)));
       const tr = h('tr', null,
-        h('td', null, it.date), h('td', null, it.title, it.note ? h('div', { class: 'muted' }, it.note) : null), h('td', null, wSel || it.who.join(' + ')), h('td', null, qIn), h('td', null, hIn),
+        h('td', null, it.date), h('td', null, it.title, it.note ? h('div', { class: 'muted' }, it.note) : null), h('td', null, wSel), h('td', null, qIn), h('td', null, hIn),
         h('td', null, h('button', { class: 'btn small gold', onclick: async (e) => {
           const qn = qIn.value.trim(), v = Number(String(hIn.value).replace(',', '.')) || 0;
-          if (!qn || !(v > 0)) return toast('Doplňte číslo nabídky a ' + (it.kind === 'lunch' ? 'částku.' : 'hodiny.'), 'err');
+          if (!qn) return toast('Chybí označení zakázky – napište ho do pole Zakázka (např. Konzum 2026-1).', 'err');
+          if (!(v > 0)) return toast(it.kind === 'lunch' ? 'Chybí částka.' : 'Chybí počet hodin.', 'err');
+          if (!quotes.some((x) => String(x.number).trim().toLowerCase() === qn.toLowerCase())) return toast('Zakázka „' + qn + '“ v aplikaci neexistuje. Založte ji v záložce Zakázky, nebo vyberte z nabídky.', 'err');
           e.target.disabled = true;
           try {
             if (it.kind === 'lunch') {
               const w = wSel.value; if (!w) { e.target.disabled = false; return toast('Vyberte, kdo měl oběd.', 'err'); }
               await addRecord('cost', { quote: qn, desc: it.what || 'Oběd', payer: w, amount: v, gcal_id: it.id + ':' + w, gcal_upd: it.ev.updated }, it.date);
-            } else for (const w of it.who) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w, gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
+            } else for (const w of (wSel.value === '*' ? PAYERS() : [wSel.value])) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w, gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
             tr.remove(); onChange();
           } catch (er) { toast(er.message, 'err'); e.target.disabled = false; }
         } }, 'Zapsat'), ' ', h('button', { class: 'btn small ghost', title: 'Tuto událost už nenabízet', onclick: async () => { try { await addRecord('gcal_skip', { gcal_id: it.id }, it.date); tr.remove(); } catch (er) { toast(er.message, 'err'); } } }, 'Ignorovat')));
       return tr;
     });
-    queueBox.replaceChildren(h('h3', null, `K přiřazení (${queue.length})`), h('p', { class: 'muted' }, 'Tyto události aplikace nedokázala jednoznačně přiřadit (chybí číslo nabídky, celodenní událost nebo oběd bez zakázky v ten den).'),
+    queueBox.replaceChildren(h('h3', null, `K přiřazení (${queue.length})`), h('p', { class: 'muted' }, 'Tyto události aplikace nedokázala jednoznačně přiřadit. U každé je napsáno proč.'),
       h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Datum', 'Událost', 'Kdo', 'Zakázka', 'Hodin / Kč', ''].map((x) => h('th', null, x)))), h('tbody', null, rows))), dl);
   };
 

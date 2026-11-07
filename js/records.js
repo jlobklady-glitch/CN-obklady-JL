@@ -20,7 +20,7 @@ export function recordsList({ kind, fields, defaults = () => ({}), onChange = ()
       const set = (v) => { if (f.k === '_date') r.rec_date = v; else r.data[f.k] = v; };
       let el;
       if (f.type === 'select') {
-        el = h('select', { onchange: (e) => { set(e.target.value); upd(); save(r); } },
+        el = h('select', { onchange: async (e) => { if (f.onPick && await f.onPick(r, e.target.value)) { onChange(); draw(); return; } set(e.target.value); upd(); save(r); } },
           h('option', { value: '' }, '—'), (typeof f.options === 'function' ? f.options() : f.options).map((o) => h('option', { selected: o === get() }, o)));
       } else if (f.type === 'bool') {
         el = h('select', { onchange: (e) => { set(e.target.value); save(r); } }, h('option', { value: '' }, 'Ne'), h('option', { value: 'ANO', selected: get() === 'ANO' }, 'ANO'));
