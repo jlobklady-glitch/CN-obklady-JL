@@ -81,7 +81,7 @@ export async function settlementEditor(root, id) {
         await saver.flush();
         const t = settlementTotals(q);
         try {
-          const inv = await createInvoice({ quote_id: q.id, profile: q.profile || S.profile, issued_on: isoToday(), due_on: addDays(isoToday(), S.firma.due_days || 14),
+          const inv = await createInvoice({ quote_id: q.id, profile: q.profile || S.profile, issued_on: isoToday(), taxable_on: (q.settlement && q.settlement.date) || isoToday(), due_on: addDays(isoToday(), S.firma.due_days || 14),
             customer_name: q.customer_name, customer_address: q.customer_address,
             customer_ids: (() => { const c = S.contacts.find((x) => x.id === q.customer_id); return c && c.kind === 'PO' ? [c.ico && 'IČO ' + c.ico, c.dic && 'DIČ ' + c.dic].filter(Boolean).join(', ') : ''; })(),
             description: `${t.advance ? 'Doplatek – ' : ''}${q.project ? q.project : 'Obkladačské práce'}${bez ? '' : ' (dle nabídky ' + q.number + ')'}`, amount: t.due });
@@ -144,6 +144,7 @@ export async function invoiceEditor(root, id) {
     h('div', { class: 'card' }, h('div', { class: 'grid c3' },
       fld('Číslo faktury (= variabilní symbol)', h('input', { type: 'text', value: inv.number, oninput: bind('number') })),
       fld('Datum vystavení', h('input', { type: 'date', value: inv.issued_on, oninput: bind('issued_on') })),
+      fld('Datum zdanitelného plnění', h('input', { type: 'date', value: inv.taxable_on || inv.issued_on, oninput: bind('taxable_on') })),
       fld('Splatnost', h('input', { type: 'date', value: inv.due_on || '', oninput: bind('due_on') })),
       fld('Odběratel', h('input', { type: 'text', value: inv.customer_name, oninput: bind('customer_name') })),
       fld('Adresa', h('input', { type: 'text', value: inv.customer_address, oninput: bind('customer_address') })),

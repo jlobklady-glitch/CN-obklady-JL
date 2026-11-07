@@ -367,7 +367,7 @@ export async function createInvoice(row) {
   }
 }
 export async function saveInvoice(i, force = false) {
-  const row = { number: i.number, issued_on: i.issued_on || isoToday(), due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
+  const row = { number: i.number, issued_on: i.issued_on || isoToday(), taxable_on: i.taxable_on || i.issued_on || isoToday(), due_on: i.due_on || null, customer_name: i.customer_name, customer_address: i.customer_address,
     customer_ids: i.customer_ids, description: i.description, amount: parseNum(i.amount), paid: !!i.paid, profile: i.profile || S.profile || null };
   const data = await guardedUpdate('invoices', row, i.id, i.updated_at, force);
   i.updated_at = data.updated_at;

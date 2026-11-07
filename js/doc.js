@@ -141,6 +141,7 @@ export function invoiceDoc(inv) {
       <div class="cus"><div class="lab">Odběratel</div>${[['Jméno / firma', inv.customer_name], ['Adresa', inv.customer_address], ['IČO / DIČ', inv.customer_ids]].filter((r) => r[1]).map(([l, v]) => `<div class="r"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>
     <div class="boxes"><div><div class="bl">Číslo faktury</div><div class="bv">${esc(inv.number)}</div></div>
       <div><div class="bl">Datum vystavení</div><div class="bv">${fmtDate(inv.issued_on)}</div></div>
+      <div><div class="bl">Datum zdanitelného plnění</div><div class="bv">${fmtDate(inv.taxable_on || inv.issued_on)}</div></div>
       <div><div class="bl">Splatnost</div><div class="bv">${fmtDate(inv.due_on)}</div></div></div>
     <table class="dt"><thead><tr><th class="l">POPIS</th><th>CELKEM</th></tr></thead><tbody><tr><td style="white-space:pre-wrap">${esc(inv.description)}</td><td class="tot">${kc(inv.amount)}</td></tr></tbody></table>
     <div class="keep"><div class="total"><div class="l">CELKEM K ÚHRADĚ</div><div class="v">${kc(inv.amount)}</div></div>
