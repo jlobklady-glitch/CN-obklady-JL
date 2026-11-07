@@ -60,16 +60,15 @@ export function parseLunch(title) {
   const m = t.match(/(\d[\d\s]*(?:[.,]\d+)?)\s*(?:kc|czk)?\s*$/) || t.match(/(\d+(?:[.,]\d+)?)/);
   return m ? { amount: Number(String(m[1]).replace(/\s/g, '').replace(',', '.')) || 0 } : { amount: 0 };
 }
-export function eventHours(ev, breakMin) {
+export function eventHours(ev) {
   if (!ev.start || !ev.start.dateTime || !ev.end || !ev.end.dateTime) return null; // celodenní
   let mins = (new Date(ev.end.dateTime) - new Date(ev.start.dateTime)) / 60000;
   if (mins <= 0 || mins > 16 * 60) return null;
-  if (mins > 6 * 60) mins -= n(breakMin);
   return Math.round((mins / 60) * 4) / 4;
 }
 
 // Načte události a vrací { created, updated, queue }. Co nejde přiřadit jednoznačně, jde do fronty.
-export async function syncCalendar({ calendarId, days = 45, breakMin = 0 }) {
+export async function syncCalendar({ calendarId, days = 45 }) {
   const quotes = await listQuotes();
   const workers = PAYERS();
   await Promise.all([loadRecords('hours'), loadRecords('cost'), loadRecords('gcal_skip')]);
@@ -98,7 +97,7 @@ export async function syncCalendar({ calendarId, days = 45, breakMin = 0 }) {
     if (lunch) { lunches.push({ ev, title, date, amount: lunch.amount }); continue; }
     const who = workersIn(title, workers);
     const quote = findQuote(title, quotes);
-    const hrs = eventHours(ev, breakMin);
+    const hrs = eventHours(ev);
     if (!quote || hrs === null) {
       if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w))) res.queue.push({ ev, id: ev.id, title, date, who, hours: hrs, quote: quote ? quote.number : '', kind: 'hours' });
       continue;
@@ -137,7 +136,6 @@ export function calendarPanel(onChange) {
   const status = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
   const queueBox = h('div');
   const calSel = h('select', { onchange: (e) => ls.set('cal', e.target.value) });
-  const brk = h('input', { type: 'text', inputmode: 'numeric', value: ls.get('break', '0'), style: { width: '70px' }, onchange: (e) => ls.set('break', String(n(e.target.value))) });
   const last = () => { const v = ls.get('last', ''); return v ? 'Naposledy načteno ' + new Date(v).toLocaleString('cs-CZ') : 'Zatím nenačteno.'; };
   status.textContent = last();
 
@@ -183,7 +181,7 @@ export function calendarPanel(onChange) {
       }
       status.textContent = 'Načítám události…';
       const quotes = await listQuotes();
-      const r = await syncCalendar({ calendarId: calSel.value || ls.get('cal', 'primary'), breakMin: n(brk.value) });
+      const r = await syncCalendar({ calendarId: calSel.value || ls.get('cal', 'primary') });
       status.textContent = `Nově zapsáno ${r.created}, aktualizováno ${r.updated}, ke kontrole ${r.queue.length}. ` + last();
       drawQueue(r.queue, quotes); onChange();
     } catch (er) { status.textContent = ''; toast(er.message, 'err'); }
@@ -191,8 +189,8 @@ export function calendarPanel(onChange) {
   } }, 'Načíst z kalendáře');
 
   box.append(h('h2', null, 'Google Kalendář'),
-    h('p', { class: 'muted' }, 'V nadpisu události uveďte číslo nabídky (např. „Lukáš Honza 2026-014“). Bez jména se hodiny zapíšou oběma, s jedním jménem jen tomu. Hodiny se berou z času začátku a konce. Oběd: „Lukáš oběd 400“ (zapíše se k zakázce, na které ten den měl hodiny).'),
-    h('div', { class: 'row', style: { gap: '10px', alignItems: 'end', flexWrap: 'wrap' } }, h('div', null, h('label', { class: 'f' }, 'Kalendář'), calSel), h('div', null, h('label', { class: 'f' }, 'Pauza při dni nad 6 h (min)'), brk), go),
+    h('p', { class: 'muted' }, 'V nadpisu události uveďte číslo nabídky (např. „Lukáš Honza 2026-014“). Bez jména se hodiny zapíšou oběma, s jedním jménem jen tomu. Hodiny se berou z času začátku a konce, bez odečtu pauz. Oběd: „Lukáš oběd 400“ (zapíše se k zakázce, na které ten den měl hodiny).'),
+    h('div', { class: 'row', style: { gap: '10px', alignItems: 'end', flexWrap: 'wrap' } }, h('div', null, h('label', { class: 'f' }, 'Kalendář'), calSel), go),
     status, queueBox);
   return box;
 }
