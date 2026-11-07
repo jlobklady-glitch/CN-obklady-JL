@@ -106,6 +106,8 @@ export function settlementDoc(q) {
     <td class="c">${num(r.qty)}</td><td class="r">${kc(Math.round(list * 100) / 100)}</td><td class="c">${pct(sl)}</td><td class="r">${kc(after)}</td><td class="tot">${kc(lineTotal(r))}</td></tr>`;
   }).join('');
   const sum = [];
+  const sp = splitTotals(items);
+  if (sp.hasWork || sp.hasMat) sum.push(['Práce celkem (včetně dopravy)', kc(sp.work)], ['Materiál celkem', kc(sp.mat)]);
   if (!t.bez) sum.push(['Celkem dle nabídky ' + esc(q.number), kc(t.offer)], ['Rozdíl oproti nabídce', kc(t.diff)]);
   if (t.advance) sum.push(['Uhrazená záloha', kc(-t.advance)]);
   return `<div class="doc">${headBar('KONEČNÉ VYÚČTOVÁNÍ')}${partiesHtml(q)}
@@ -146,11 +148,17 @@ export function invoiceDoc(inv) {
 }
 
 // Mezisoučty práce a materiálu (jen když nabídka obsahuje obojí)
+// práce = práce, pokládka obkladu/dlažby a doprava; materiál = ostatní řádky
+export const isWorkRow = (r) => ['prace', 'stena', 'podlaha'].includes(r.typ) || /doprav/i.test(r.name || '');
+export function splitTotals(items) {
+  const work = items.filter(isWorkRow), mat = items.filter((r) => !isWorkRow(r));
+  return { work: quoteTotal(work), mat: quoteTotal(mat), hasWork: work.length > 0, hasMat: mat.length > 0 };
+}
 function subtotals(items) {
-  const work = items.filter((r) => r.typ === 'prace'), mat = items.filter((r) => r.typ !== 'prace');
-  if (!work.length || !mat.length) return '';
+  const t = splitTotals(items);
+  if (!t.hasWork || !t.hasMat) return '';
   const row = (l, v) => `<div style="display:flex;justify-content:space-between;font-size:10pt;padding:1mm 3mm;border-bottom:1px solid #ddd"><span>${l}</span><b>${kc(v)}</b></div>`;
-  return `<div style="margin:2mm 0">${row('Práce celkem', quoteTotal(work))}${row('Materiál celkem (orientační, dle ceníkových cen)', quoteTotal(mat))}</div>`;
+  return `<div style="margin:2mm 0">${row('Práce celkem (včetně dopravy)', t.work)}${row('Materiál celkem (orientační, dle ceníkových cen)', t.mat)}</div>`;
 }
 
 function packagePage(q) {
