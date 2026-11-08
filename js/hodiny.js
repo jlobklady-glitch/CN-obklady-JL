@@ -3,7 +3,7 @@ import { h, kc, num, toast } from './util.js';
 import { S, loadRecords, addRecord, saveRecord } from './store.js';
 import { recordsList } from './records.js';
 import { PAYERS, stockCalc } from './sklad.js';
-import { calendarPanel, calendarReady } from './kalendar.js';
+import { calendarPanel, calendarReady, cascadeCalendarDelete } from './kalendar.js';
 
 const n = (v) => Number(v) || 0;
 const rateOf = (name) => n((S.firma.rates || {})[name]);
@@ -39,11 +39,11 @@ export async function hodinyView(root) {
       ), h('p', { class: 'muted' }, 'K vyplacení = mzda − vyplaceno + zaplatil z vlastního − proplaceno + materiál ze skladu. Sazby za hodinu nastavíte v Nastavení.')));
   };
   const hInfo = (r) => `Náklad práce: ${kc(n(r.data.hours) * rowRate(r))} (sazba ${num(rowRate(r))} Kč/hod)`;
-  const hours = recordsList({ kind: 'hours', addLabel: '+ Nové hodiny', onChange: drawSum, rowInfo: hInfo,
+  const hours = recordsList({ kind: 'hours', addLabel: '+ Nové hodiny', onChange: drawSum, rowInfo: hInfo, onRemove: async (r) => { await cascadeCalendarDelete(r); setTimeout(() => costs.redraw(), 0); },
     fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN)', type: 'text' }, { k: 'worker', label: 'Pracovník', type: 'select', options: () => [...PAYERS(), ...(PAYERS().length > 1 ? ['Oba'] : [])],
         onPick: async (r, v) => { if (v !== 'Oba') return false; const ws = PAYERS(); r.data.worker = ws[0]; await saveRecord(r); for (const w of ws.slice(1)) await addRecord('hours', { ...r.data, worker: w, gcal_id: undefined, gcal_hours: undefined }, r.rec_date); toast('Hodiny zapsány oběma (vytvořen záznam pro každého).'); return true; } },
       { k: 'hours', label: 'Hodin', type: 'num' }, { k: 'rate', label: 'Sazba (jen když se liší)', type: 'num' }, { k: 'paid', label: 'Vyplaceno (Kč)', type: 'num' }] });
-  const costs = recordsList({ kind: 'cost', addLabel: '+ Nový náklad', onChange: drawSum,
+  const costs = recordsList({ kind: 'cost', addLabel: '+ Nový náklad', onChange: drawSum, onRemove: (r) => cascadeCalendarDelete(r),
     fields: [{ k: '_date', label: 'Datum', type: 'date' }, { k: 'quote', label: 'Zakázka (č. CN) – nebo prázdné', type: 'text' }, { k: 'desc', label: 'Popis (oběd, doprava, nářadí…)', type: 'text', wide: true },
       { k: 'payer', label: 'Kdo platil', type: 'select', options: PAYERS }, { k: 'amount', label: 'Částka (Kč)', type: 'num' }, { k: 'reimbursed', label: 'Proplaceno (Kč)', type: 'num' }] });
   const cal = calendarReady() ? calendarPanel(() => { hours.redraw(); costs.redraw(); drawSum(); }) : null;

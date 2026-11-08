@@ -95,7 +95,7 @@ export async function syncCalendar({ calendarId, days = 45 }) {
   for (const r of S.rec.hours || []) if (r.data && r.data.quote) dayQuote[r.rec_date + '|' + r.data.worker] = r.data.quote;
   const lunches = [];
   for (const ev of evs) {
-    if (ev.status === 'cancelled' || !ev.summary) continue;
+    if (ev.status === 'cancelled' || !ev.summary || skipped.has(ev.id)) continue;
     const title = ev.summary;
     const date = ev.start && (ev.start.dateTime ? pragueDate(ev.start.dateTime) : ev.start.date);
     const lunch = parseLunch(title);
@@ -109,7 +109,7 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const quote = findQuote(title, quotes);
     const hrs = eventHours(ev);
     if (!quote || hrs === null) {
-      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w + ':h'))) {
+      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w + ':h') || skipped.has(ev.id + ':' + w + ':h'))) {
         const allDay = !!(ev.start && ev.start.date);
         const why = [!quote && 'v nadpisu nebylo nalezeno číslo ani označení žádné zakázky', hrs === null && (allDay ? 'celodenní událost – doplňte hodiny (předvyplněno 8)' : 'nelze určit délku události')].filter(Boolean).join('; ');
         res.queue.push({ ev, id: ev.id, title, date, who, all: who.length === workers.length && workers.length > 1, hours: hrs === null && allDay ? 8 : hrs, quote: quote ? quote.number : '', kind: 'hours', note: why });
@@ -118,9 +118,10 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     }
     for (const w of who) {
       const gid = ev.id + ':' + w + ':h';
+      if (skipped.has(gid)) continue;
       const ex = known.get(gid);
       if (!ex) {
-        const r = await addRecord('hours', { quote: quote.number, worker: w, hours: hrs, gcal_id: gid, gcal_hours: hrs, gcal_upd: ev.updated }, date);
+        const r = await addRecord('hours', { quote: quote.number, worker: w, hours: hrs, gcal_id: gid, gcal_hours: hrs, gcal_upd: ev.updated, gcal_title: title }, date);
         known.set(gid, r); dayQuote[date + '|' + w] = quote.number; res.created++;
       } else if (ex.data.gcal_upd !== ev.updated && n(ex.data.hours) === n(ex.data.gcal_hours) && ex.data.quote === quote.number) {
         ex.data.hours = hrs; ex.data.gcal_hours = hrs; ex.data.gcal_upd = ev.updated; ex.rec_date = date; await saveRecord(ex); res.updated++;
@@ -131,11 +132,11 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const who = workersIn(L.title, workers);
     for (const w of who.length === workers.length && workers.length > 1 ? [] : who) {
       const gid = L.ev.id + ':' + w;
-      if (known.has(gid) || skipped.has(L.ev.id)) continue;
+      if (known.has(gid) || skipped.has(gid) || skipped.has(L.ev.id)) continue;
       const explicit = findQuote(L.title, quotes);
       const q = explicit ? explicit.number : dayQuote[L.date + '|' + w];
       if (q && L.amount > 0) {
-        const r = await addRecord('cost', { quote: q, desc: L.what, payer: w, amount: L.amount, gcal_id: gid, gcal_upd: L.ev.updated }, L.date);
+        const r = await addRecord('cost', { quote: q, desc: L.what, payer: w, amount: L.amount, gcal_id: gid, gcal_upd: L.ev.updated, gcal_title: L.title }, L.date);
         known.set(gid, r); res.created++;
       } else res.queue.push({ ev: L.ev, id: L.ev.id, title: L.title, date: L.date, who: [w], amount: L.amount, quote: q || '', kind: 'lunch', what: L.what });
     }
@@ -143,6 +144,27 @@ export async function syncCalendar({ calendarId, days = 45 }) {
   }
   ls.set('last', new Date().toISOString());
   return res;
+}
+
+// Smazání záznamu načteného z kalendáře: smazané hodiny odstraní i oběd/svačinu téhož člověka z téže události
+// a uloží se „náhrobek“ mezi ignorované, aby se záznam při dalším načtení neobjevil znovu (jde obnovit).
+export async function cascadeCalendarDelete(r) {
+  const gid = r.data && r.data.gcal_id;
+  if (!gid) return false;
+  const tomb = async (id, title, date) => {
+    if ((S.rec.gcal_skip || []).some((x) => x.data && x.data.gcal_id === id)) return;
+    try { await addRecord('gcal_skip', { gcal_id: id, title }, date); } catch (_) { /* nepodstatné */ }
+  };
+  const label = (x) => ((x.data.gcal_title || 'Událost z kalendáře') + (x.data.worker ? ' – ' + x.data.worker + ' (hodiny)' : x.data.payer ? ' – ' + x.data.payer + ' (' + String(x.data.desc || 'oběd').toLowerCase() + ')' : '')).trim();
+  await tomb(gid, label(r), r.rec_date);
+  if (r.kind === 'hours' && /:h$/.test(gid)) {
+    const evId = gid.split(':')[0];
+    const lunchId = evId + ':' + r.data.worker;
+    for (const x of (S.rec.cost || []).slice()) {
+      if (x.data && x.data.gcal_id === lunchId) { await tomb(lunchId, label(x), x.rec_date); await deleteRecord(x); }
+    }
+  }
+  return true;
 }
 
 // ---- panel v Hodinách ----

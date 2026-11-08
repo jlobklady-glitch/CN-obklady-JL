@@ -5,7 +5,7 @@ import { suggestBox } from './items.js';
 
 // fields: [{k,label,type:'text'|'num'|'date'|'select'|'bool'|'product'|'area', options, wide}]
 // Vrací { el, redraw }. onChange se volá po každé uložené změně (přepočet souhrnů).
-export function recordsList({ kind, fields, defaults = () => ({}), onChange = () => {}, title, addLabel = '+ Přidat', rowInfo, newestFirst = true, search = true }) {
+export function recordsList({ kind, fields, defaults = () => ({}), onChange = () => {}, title, addLabel = '+ Přidat', rowInfo, newestFirst = true, search = true, onRemove }) {
   const box = h('div', { class: 'prlist' });
   const wrap = h('div');
   let q = '';
@@ -38,7 +38,7 @@ export function recordsList({ kind, fields, defaults = () => ({}), onChange = ()
       return h('div', { class: 'pf ' + (f.wide ? 'wide' : '') }, h('label', { class: 'f' }, f.label), el);
     };
     const c = h('div', { class: 'rc' }, h('div', { class: 'rc-grid' }, fields.map(fieldEl)), info,
-      h('button', { class: 'del', title: 'Smazat záznam', onclick: async () => { if (await confirmBox('Smazat záznam?')) { try { await deleteRecord(r); onChange(); draw(); } catch (e) { toast(e.message, 'err'); } } } }, '×'));
+      h('button', { class: 'del', title: 'Smazat záznam', onclick: async () => { if (await confirmBox('Smazat záznam?')) { try { if (onRemove) await onRemove(r); await deleteRecord(r); onChange(); draw(); } catch (e) { toast(e.message, 'err'); } } } }, '×'));
     upd();
     return c;
   };
