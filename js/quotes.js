@@ -3,6 +3,7 @@ import { h, kc, fmtDate, matcher, toast, confirmBox, makeSaver, parseNum, num, i
 import { S, sb, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
   listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
+import { photosCard } from './fotky.js';
 import { itemsEditor } from './items.js';
 import { guideApplies, openGuide } from './pruvodce.js';
 import { parseFormat, triggerRe } from './skladba.js';
@@ -164,6 +165,7 @@ export async function quoteEditor(root, id) {
     h('div', { class: 'card' }, h('div', { class: 'grid c2' },
       field('Poznámka k nabídce', h('textarea', { oninput: bind('note') }, q.note || ''), 'span2'),
       field('Stav platby', h('select', { onchange: bind('payment_status') }, PLATBA.map((s) => h('option', { selected: s === q.payment_status }, s)))))),
+    photosCard(q, touch),
     h('div', { class: 'row end' },
       h('button', { class: 'btn ghost', onclick: async () => { try { const n = await duplicateQuote(q); toast('Zkopírováno jako ' + n.number); location.hash = '#/nabidka/' + n.id; } catch (e) { toast(e.message, 'err'); } } }, 'Duplikovat'),
       h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox(`Smazat nabídku ${q.number}?`)) { try { await deleteQuote(q.id); } catch (e) { return toast(e.message, 'err'); } saver.stop(); window.__flushSave = null; window.__isDirty = null; location.hash = '#/nabidky'; } } }, 'Smazat')),

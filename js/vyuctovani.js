@@ -3,6 +3,7 @@ import { h, kc, fmtDate, toast, confirmBox, askText, makeSaver, parseNum, isoTod
 import { S, loadRecords, getQuote, saveQuote, listQuotes, newBezCN, listInvoices, getInvoice, createInvoice, saveInvoice, deleteInvoice, quoteTotal } from './store.js';
 import { itemsEditor } from './items.js';
 import { openEmailDialog } from './email.js';
+import { photosCard } from './fotky.js';
 import { savePdfToDrive, pdfName } from './pdf.js';
 import { settlementDoc, settlementTotals, splitTotals, SET_STATES, settlementStatus, invoiceDoc, printDoc } from './doc.js';
 
@@ -144,7 +145,7 @@ export async function settlementEditor(root, id) {
         } }, 'Použít na všechen materiál MAPEI'))),
     h('div', { class: 'card' }, h('h2', null, 'Skutečně provedené položky'), ed.box,
       h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn ghost', onclick: () => ed.add() }, '+ Přidat řádek'))),
-    sums, intBox,
+    sums, intBox, photosCard(q, touch),
     h('div', { class: 'card' }, fld('Poznámka', h('textarea', { oninput: bind(st, 'note') }, st.note || ''))),
     invBox, preview);
   drawSums();
