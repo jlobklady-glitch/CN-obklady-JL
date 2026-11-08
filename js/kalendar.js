@@ -1,6 +1,6 @@
 // Načítání hodin a obědů z Google Kalendáře do evidence hodin a nákladů.
 import { h, kc, num, toast } from './util.js';
-import { S, listQuotes, addRecord, saveRecord, loadRecords } from './store.js';
+import { S, listQuotes, addRecord, saveRecord, deleteRecord, loadRecords } from './store.js';
 import { GOOGLE_CLIENT_ID } from './config.js';
 import { loadGsi } from './gmail.js';
 import { PAYERS } from './sklad.js';
@@ -151,7 +151,8 @@ export function calendarPanel(onChange) {
   const box = h('div', { class: 'card' });
   const status = h('p', { class: 'muted', style: { minHeight: '1.3em' } }, '');
   const queueBox = h('div');
-  const calSel = h('select', { onchange: (e) => ls.set('cal', e.target.value) });
+  const calSel = h('select', { onchange: (e) => { ls.set('cal', e.target.value); ls.set('calname', e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : ''); } });
+  if (ls.get('cal', '')) calSel.append(h('option', { value: ls.get('cal', ''), selected: true }, ls.get('calname', '') || ls.get('cal', '')));
   const last = () => { const v = ls.get('last', ''); return v ? 'Naposledy načteno ' + new Date(v).toLocaleString('cs-CZ') : 'Zatím nenačteno.'; };
   status.textContent = last();
 
@@ -178,13 +179,24 @@ export function calendarPanel(onChange) {
             } else for (const w of (wSel.value === '*' ? PAYERS() : [wSel.value])) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w + ':h', gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
             tr.remove(); onChange();
           } catch (er) { toast(er.message, 'err'); e.target.disabled = false; }
-        } }, 'Zapsat'), ' ', h('button', { class: 'btn small ghost', title: 'Tuto událost už nenabízet', onclick: async () => { try { await addRecord('gcal_skip', { gcal_id: it.id }, it.date); tr.remove(); } catch (er) { toast(er.message, 'err'); } } }, 'Ignorovat')));
+        } }, 'Zapsat'), ' ', h('button', { class: 'btn small ghost', title: 'Tuto událost už nenabízet', onclick: async () => { try { await addRecord('gcal_skip', { gcal_id: it.id, title: it.title }, it.date); tr.remove(); drawIgn(); } catch (er) { toast(er.message, 'err'); } } }, 'Ignorovat')));
       return tr;
     });
     queueBox.replaceChildren(h('h3', null, `K přiřazení (${queue.length})`), h('p', { class: 'muted' }, 'Tyto události aplikace nedokázala jednoznačně přiřadit. U každé je napsáno proč.'),
       h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Datum', 'Událost', 'Kdo', 'Zakázka', 'Hodin / Kč', ''].map((x) => h('th', null, x)))), h('tbody', null, rows))), dl);
   };
 
+  const ignBox = h('div');
+  let ignOpen = false;
+  const drawIgn = () => {
+    const list = (S.rec.gcal_skip || []).slice().sort((a, b) => String(b.rec_date).localeCompare(String(a.rec_date)));
+    const head = h('button', { class: 'btn small ghost', onclick: async () => { ignOpen = !ignOpen; if (ignOpen) { try { await loadRecords('gcal_skip'); } catch (_) { /* nic */ } } drawIgn(); } }, (ignOpen ? 'Skrýt' : 'Zobrazit') + ` ignorované události (${list.length})`);
+    ignBox.replaceChildren(head, ignOpen ? (list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Datum', 'Událost', ''].map((x) => h('th', null, x)))),
+      h('tbody', null, list.map((r) => h('tr', null, h('td', null, r.rec_date), h('td', null, r.data.title || '(bez názvu)'),
+        h('td', null, h('button', { class: 'btn small gold', onclick: async (e) => { e.target.disabled = true; try { await deleteRecord(r); S.rec.gcal_skip = (S.rec.gcal_skip || []).filter((x) => x.id !== r.id); toast('Obnoveno – klikněte na „Načíst z kalendáře“, událost se znovu nabídne.'); drawIgn(); } catch (er) { toast(er.message, 'err'); e.target.disabled = false; } } }, 'Obnovit'))))))) : h('p', { class: 'muted' }, 'Žádné ignorované události.')) : null);
+  };
+  loadRecords('gcal_skip').then(drawIgn).catch(() => {});
+  drawIgn();
   const go = h('button', { class: 'btn gold', onclick: async (e) => {
     e.target.disabled = true;
     try {
@@ -195,7 +207,7 @@ export function calendarPanel(onChange) {
       const cur = ls.get('cal', '');
       const want = cals.some((c) => c.id === cur) ? cur : (cals.find((c) => c.primary) || cals[0] || {}).id;
       calSel.replaceChildren(...cals.map((c) => h('option', { value: c.id, selected: c.id === want }, c.name)));
-      calSel.value = want;
+      calSel.value = want; ls.set('calname', (cals.find((c) => c.id === want) || {}).name || '');
       if (cals.length > 1 && !cals.some((c) => c.id === cur)) { status.textContent = 'Vyberte kalendář s pracovními událostmi a klikněte na „Načíst z kalendáře“ znovu.'; e.target.disabled = false; return; }
       ls.set('cal', want);
       status.textContent = 'Načítám události…';
@@ -210,6 +222,6 @@ export function calendarPanel(onChange) {
   box.append(h('h2', null, 'Google Kalendář'),
     h('p', { class: 'muted' }, 'V nadpisu události uveďte číslo nabídky (např. „Lukáš Honza 2026-014“). Bez jména se hodiny zapíšou oběma, s jedním jménem jen tomu. Hodiny se berou z času začátku a konce, bez odečtu pauz. Oběd nebo svačina: „Lukáš oběd 400“ (zapíše se k zakázce, na které ten den měl hodiny).'),
     h('div', { class: 'row', style: { gap: '10px', alignItems: 'end', flexWrap: 'wrap' } }, h('div', null, h('label', { class: 'f' }, 'Kalendář'), calSel), go),
-    status, queueBox);
+    status, queueBox, ignBox);
   return box;
 }
