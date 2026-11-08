@@ -101,9 +101,9 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const lunch = parseLunch(title);
     if (lunch) {
       lunches.push({ ev, title, date, amount: lunch.amount, what: lunch.kind });
-      // celodenní práce s poznámkou o obědě v nadpisu: počítají se i odpracované hodiny; krátká událost jen s obědem hodiny nemá
+      // událost s označením zakázky i obědem v nadpisu: počítají se i odpracované hodiny (od půl hodiny); událost jen s obědem bez zakázky hodiny nemá
       const dh = eventHours(ev);
-      if (dh === null || dh < 3) continue;
+      if (dh === null || dh < 0.5 || !findQuote(title, quotes)) continue;
     }
     const who = workersIn(title, workers);
     const quote = findQuote(title, quotes);
