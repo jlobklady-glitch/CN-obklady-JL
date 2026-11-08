@@ -6,6 +6,7 @@ import { APP_VERSION } from './config.js';
 import { quotesList, quoteEditor } from './quotes.js';
 import { zakazkyView } from './zakazky.js';
 import { invoicesView } from './faktury.js';
+import { rocniView } from './rocni.js';
 import { settlementEditor, settlementsList, invoiceEditor } from './vyuctovani.js';
 import { prehledView } from './prehled.js';
 import { openBundledPrace, bundledPending } from './cenikimport.js';
@@ -67,7 +68,7 @@ function profilePicker(then) {
       h('p', { class: 'muted' }, 'Profil mění jen údaje dodavatele v záhlaví nabídek a faktur. Data jsou společná. Profil lze kdykoli změnit v menu.'))));
 }
 
-const TABS = [['#/prehled', 'Přehled'], ['#/poptavky', 'Poptávky'], ['#/nabidky', 'Nabídky'], ['#/zakazky', 'Zakázky'], ['#/vyuctovani', 'Vyúčtování'], ['#/faktury', 'Faktury'], ['#/zisk', 'Ziskovost'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
+const TABS = [['#/prehled', 'Přehled'], ['#/poptavky', 'Poptávky'], ['#/nabidky', 'Nabídky'], ['#/zakazky', 'Zakázky'], ['#/vyuctovani', 'Vyúčtování'], ['#/faktury', 'Faktury'], ['#/zisk', 'Ziskovost'], ['#/rocni', 'Roční přehled'], ['#/zbylo', 'Zbylo navíc'], ['#/sklad', 'Sklad'], ['#/hodiny', 'Hodiny a náklady'], ['#/kontakty', 'Kontakty'], ['#/ceniky', 'Ceníky'], ['#/nastaveni', 'Nastavení']];
 
 function stackAll(el) {
   el.querySelectorAll('table.t').forEach((t) => {
@@ -117,6 +118,7 @@ async function route() {
     else if (hash === '#/vyuctovani') await settlementsList(main);
     else if (hash === '#/zakazky') await zakazkyView(main);
     else if (hash === '#/faktury') await invoicesView(main);
+    else if (hash === '#/rocni') await rocniView(main);
     else if (hash.startsWith('#/objednavka/')) await orderView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/protokol/')) await handoverView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/poptavky')) await inquiriesView(main);

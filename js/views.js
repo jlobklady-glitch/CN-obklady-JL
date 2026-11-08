@@ -178,8 +178,8 @@ export function settingsView(root) {
   let orig = JSON.parse(JSON.stringify(S.firmaBase));
   f.profiles = f.profiles || {};
   const P = (f.profiles[S.profile] = f.profiles[S.profile] || {});
-  const pinp = (k) => h('input', { type: 'text', value: P[k] ?? '', oninput: (e) => { P[k] = e.target.value; } });
-  const inp = (k, type = 'text') => h('input', { type, value: f[k] ?? '', oninput: (e) => { f[k] = type === 'number' ? parseNum(e.target.value) : e.target.value; } });
+  const pinp = (k) => h('input', { type: 'text', value: P[k] ?? '', oninput: (e) => { P[k] = e.target.value; }, onchange: () => saveSettings() });
+  const inp = (k, type = 'text') => h('input', { type, value: f[k] ?? '', oninput: (e) => { f[k] = type === 'number' ? parseNum(e.target.value) : e.target.value; }, onchange: () => saveSettings() });
   const fld = (l, el, cls) => h('div', { class: cls || '' }, h('label', { class: 'f' }, l), el);
   f.workers = f.workers && f.workers.length ? f.workers : ['Lukáš', 'Honza'];
   f.rates = f.rates || {};
@@ -212,7 +212,7 @@ export function settingsView(root) {
       fld('Instagram (odkaz)', inp('instagram')), fld('YouTube (odkaz)', inp('youtube')), fld('Facebook (odkaz)', inp('facebook')), fld('Slogan v záhlaví', inp('tagline'), 'span2'),
       fld('Platnost nabídky (dní)', inp('valid_days', 'number')), fld('Splatnost faktury (dní)', inp('due_days', 'number')),
       fld('Výchozí nákupní sleva MAPEI (0,28 = 28 %)', inp('mapei_discount', 'number')), fld('Přirážka KABE (0,10 = 10 %)', inp('kabe_markup', 'number')),
-      fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; } }, f.terms || ''), 'span2')),
+      fld('Obchodní podmínky v nabídce', h('textarea', { rows: 4, oninput: (e) => { f.terms = e.target.value; }, onchange: () => saveSettings() }, f.terms || ''), 'span2')),
       h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
     h('div', { class: 'card' }, h('h2', null, 'Pracovníci a hodinové sazby'), workersBox,
       h('div', { class: 'row end', style: { marginTop: '12px' } }, h('button', { class: 'btn gold', onclick: saveSettings }, 'Uložit'))),
