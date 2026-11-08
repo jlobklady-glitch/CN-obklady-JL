@@ -62,7 +62,7 @@ export function parseLunch(title) {
   const t = norm(title);
   const kind = /\bobed/.test(t) ? 'Oběd' : /svacin/.test(t) ? 'Svačina' : null;
   if (!kind) return null;
-  const m = t.match(/(\d[\d\s]*(?:[.,]\d+)?)\s*(?:kc|czk)?\s*$/) || t.match(/(\d+(?:[.,]\d+)?)/);
+  const m = t.match(/(?:obed|svacin\w*)\s*[:=-]?\s*(\d+(?:[.,]\d+)?)/) || t.match(/(\d+(?:[.,]\d+)?)\s*(?:kc|czk)?\s*(?:obed|svacin)/) || t.match(/(\d[\d\s]*(?:[.,]\d+)?)\s*(?:kc|czk)?\s*$/) || t.match(/(\d+(?:[.,]\d+)?)/);
   return { kind, amount: m ? Number(String(m[1]).replace(/\s/g, '').replace(',', '.')) || 0 : 0 };
 }
 export function eventHours(ev) {
@@ -99,12 +99,17 @@ export async function syncCalendar({ calendarId, days = 45 }) {
     const title = ev.summary;
     const date = ev.start && (ev.start.dateTime ? pragueDate(ev.start.dateTime) : ev.start.date);
     const lunch = parseLunch(title);
-    if (lunch) { lunches.push({ ev, title, date, amount: lunch.amount, what: lunch.kind }); continue; }
+    if (lunch) {
+      lunches.push({ ev, title, date, amount: lunch.amount, what: lunch.kind });
+      // celodenní práce s poznámkou o obědě v nadpisu: počítají se i odpracované hodiny; krátká událost jen s obědem hodiny nemá
+      const dh = eventHours(ev);
+      if (dh === null || dh < 3) continue;
+    }
     const who = workersIn(title, workers);
     const quote = findQuote(title, quotes);
     const hrs = eventHours(ev);
     if (!quote || hrs === null) {
-      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w))) {
+      if (!skipped.has(ev.id) && !who.every((w) => known.has(ev.id + ':' + w + ':h'))) {
         const allDay = !!(ev.start && ev.start.date);
         const why = [!quote && 'v nadpisu nebylo nalezeno číslo ani označení žádné zakázky', hrs === null && (allDay ? 'celodenní událost – doplňte hodiny (předvyplněno 8)' : 'nelze určit délku události')].filter(Boolean).join('; ');
         res.queue.push({ ev, id: ev.id, title, date, who, all: who.length === workers.length && workers.length > 1, hours: hrs === null && allDay ? 8 : hrs, quote: quote ? quote.number : '', kind: 'hours', note: why });
@@ -112,7 +117,7 @@ export async function syncCalendar({ calendarId, days = 45 }) {
       continue;
     }
     for (const w of who) {
-      const gid = ev.id + ':' + w;
+      const gid = ev.id + ':' + w + ':h';
       const ex = known.get(gid);
       if (!ex) {
         const r = await addRecord('hours', { quote: quote.number, worker: w, hours: hrs, gcal_id: gid, gcal_hours: hrs, gcal_upd: ev.updated }, date);
@@ -170,7 +175,7 @@ export function calendarPanel(onChange) {
             if (it.kind === 'lunch') {
               const w = wSel.value; if (!w) { e.target.disabled = false; return toast('Vyberte, kdo měl oběd.', 'err'); }
               await addRecord('cost', { quote: qn, desc: it.what || 'Oběd', payer: w, amount: v, gcal_id: it.id + ':' + w, gcal_upd: it.ev.updated }, it.date);
-            } else for (const w of (wSel.value === '*' ? PAYERS() : [wSel.value])) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w, gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
+            } else for (const w of (wSel.value === '*' ? PAYERS() : [wSel.value])) await addRecord('hours', { quote: qn, worker: w, hours: v, gcal_id: it.id + ':' + w + ':h', gcal_hours: v, gcal_upd: it.ev.updated }, it.date);
             tr.remove(); onChange();
           } catch (er) { toast(er.message, 'err'); e.target.disabled = false; }
         } }, 'Zapsat'), ' ', h('button', { class: 'btn small ghost', title: 'Tuto událost už nenabízet', onclick: async () => { try { await addRecord('gcal_skip', { gcal_id: it.id }, it.date); tr.remove(); } catch (er) { toast(er.message, 'err'); } } }, 'Ignorovat')));
