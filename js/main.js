@@ -12,6 +12,7 @@ import { prehledView } from './prehled.js';
 import { openBundledPrace, bundledPending } from './cenikimport.js';
 import { orderView } from './objednavka.js';
 import { handoverView } from './protokol.js';
+import { contractView } from './smlouva.js';
 import { ziskView } from './ziskovost.js';
 import { skladView } from './sklad.js';
 import { hodinyView } from './hodiny.js';
@@ -94,7 +95,7 @@ async function route() {
   const hash = location.hash || '#/prehled';
   lastHash = hash;
   const main = h('main');
-  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/objednavka/') || hash.startsWith('#/protokol/'))) || (href === '#/vyuctovani' && hash.startsWith('#/faktura/'));
+  const isActive = (href) => hash.startsWith(href) || (href === '#/nabidky' && (hash.startsWith('#/nabidka/') || hash.startsWith('#/objednavka/') || hash.startsWith('#/protokol/') || hash.startsWith('#/smlouva/'))) || (href === '#/vyuctovani' && hash.startsWith('#/faktura/'));
   const close = () => { drawer.classList.remove('open'); scrim.classList.remove('open'); };
   const scrim = h('div', { class: 'scrim', onclick: close });
   const drawer = h('aside', { class: 'drawer' },
@@ -121,6 +122,7 @@ async function route() {
     else if (hash === '#/rocni') await rocniView(main);
     else if (hash.startsWith('#/objednavka/')) await orderView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/protokol/')) await handoverView(main, hash.split('/')[2]);
+    else if (hash.startsWith('#/smlouva/')) await contractView(main, hash.split('/')[2]);
     else if (hash.startsWith('#/poptavky')) await inquiriesView(main);
     else if (hash.startsWith('#/zisk')) await ziskView(main);
     else if (hash.startsWith('#/sklad')) await skladView(main);

@@ -143,6 +143,7 @@ export async function quoteEditor(root, id) {
       h('button', { class: 'btn ghost small', onclick: showPreview }, 'Náhled'),
       h('a', { href: '#/objednavka/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Objednávka'),
       h('a', { href: '#/vyuctovani/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Vyúčtování'),
+      h('a', { href: '#/smlouva/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Smlouva o dílo'),
       h('a', { href: '#/protokol/' + q.id, class: 'btn ghost small', style: { textDecoration: 'none' } }, 'Předávací protokol'),
       h('button', { class: 'btn small', onclick: sendEmail }, 'Poslat e-mailem'),
       h('button', { class: 'btn ghost small', onclick: (e) => { savePdfToDrive(quoteDoc(q), pdfName(q.number, q.customer_name), e.target, saver.flush()); } }, 'PDF na Disk'),

@@ -49,6 +49,7 @@ export function quoteDoc(q) {
     <div class="small">Cena je orientační. Dodavatel není plátcem DPH, cena je tedy konečná a žádná další daň se k ní nepřipočítává.</div>
     <div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(q.note)}</div>
     <div class="terms">${esc(f.terms)}</div>
+    ${consumerInfo(f)}
     <div class="band">SLEDUJTE NÁS – INSTAGRAM @JL_OBKLADY · YOUTUBE @JL_OBKLADY</div>
     <img class="strip" src="assets/strip-cn.jpg" alt="">
     <div class="foot">${esc(f.name)} · ${esc(f.phone)} · ${esc(f.email)}</div></div>
@@ -246,6 +247,120 @@ export function handoverDoc(q) {
     ${defects.length ? `<table class="dt"><thead><tr><th>#</th><th class="l">POPIS</th><th>TERMÍN ODSTRANĚNÍ</th></tr></thead><tbody>${defRows}</tbody></table>` : '<div class="notebox">Žádné.</div>'}
     <div style="margin-top:3mm;font-size:9.5pt">${decl}</div>
     ${ho.note ? `<div class="lab" style="margin-top:3mm">Poznámka</div><div class="notebox">${esc(ho.note)}</div>` : ''}
+    ${ho.photoConsent ? `<div style="margin-top:3mm;font-size:9.5pt">Objednatel ${ho.photoConsent === 'ano' ? '<b>souhlasí</b>' : '<b>nesouhlasí</b>'} s použitím fotografií hotového díla bez identifikace osob a adresy na webu a sociálních sítích zhotovitele. Souhlas je dobrovolný a lze jej kdykoli odvolat.</div>` : ''}
     <div style="display:flex;gap:12mm;margin-top:8mm">${sig(ho.sigC, 'Objednatel (převzal)', ho.nameC || q.customer_name)}${sig(ho.sigZ, 'Zhotovitel (předal)', ho.nameZ || f.name)}</div>
     <div style="font-size:8.5pt;margin-top:2mm;color:#555">V ${esc(ho.place || '')} dne ${fmtDate(ho.date || isoToday())}</div>${footer()}</div></div>`;
+}
+
+
+// Informace spotřebiteli podle § 1820 občanského zákoníku (smlouva na dálku / mimo obchodní prostory) a § 14 zákona o ochraně spotřebitele
+export function consumerInfo(f) {
+  return `<div class="keep" style="margin-top:3mm;font-size:8.3pt;line-height:1.35;color:#374151">
+    <div class="lab">Informace pro spotřebitele (§ 1820 občanského zákoníku)</div>
+    <div><b>Dodavatel:</b> ${esc(f.name)}, ${esc(f.address)}, IČO ${esc(f.ico)}, tel. ${esc(f.phone)}${f.email ? ', e-mail ' + esc(f.email) : ''}. Práce provádíme v místě zakázky, provozovna je shodná se sídlem.</div>
+    <div><b>Cena a platba:</b> cena je orientační, konečná cena vyplyne z vyúčtování skutečně provedených prací. Dodavatel není plátcem DPH. Doprava je zahrnuta v ceně prací. Platba bankovním převodem, případnou zálohu a splatnost stanoví smlouva o dílo nebo faktura.</div>
+    <div><b>Právo odstoupit od smlouvy:</b> bude-li smlouva uzavřena na dálku (e-mailem, telefonem) nebo mimo obchodní prostory dodavatele (např. v místě vaší nemovitosti), můžete od ní jako spotřebitel odstoupit bez udání důvodu do 14 dnů od jejího uzavření (§ 1829 občanského zákoníku). Stačí jednoznačné prohlášení zaslané na výše uvedenou adresu nebo e-mail dodavatele, můžete využít vzorový formulář, který obdržíte se smlouvou. Požádáte-li o zahájení prací před uplynutím této lhůty, uhradíte při odstoupení poměrnou část ceny za plnění poskytnuté do odstoupení (§ 1834). Právo odstoupit zaniká, jakmile je dílo s vaším výslovným souhlasem v plném rozsahu provedeno a byli jste o tom předem poučeni (§ 1837 písm. a).</div>
+    <div><b>Vady a záruka:</b> dílo provádíme s odbornou péčí a odpovídáme za vady podle občanského zákoníku. Délku případné záruky za jakost uvede smlouva o dílo a předávací protokol. Vady oznamte bez zbytečného odkladu e-mailem nebo dopisem, do 15 dnů vám sdělíme, zda reklamaci uznáváme.</div>
+    <div><b>Mimosoudní řešení sporů:</b> subjektem mimosoudního řešení spotřebitelských sporů je Česká obchodní inspekce, Štěpánská 567/15, 120 00 Praha 2, www.coi.cz (adr.coi.cz).</div>
+    <div><b>Osobní údaje:</b> zpracováváme je jen pro přípravu nabídky a plnění smlouvy a dále je nepředáváme. Podrobnosti najdete v zásadách ochrany osobních údajů na našem webu.</div>
+  </div>`;
+}
+
+
+// ---------- Smlouva o dílo (vzor od právníka upravený pro JL-OBKLADY; data v q.settlement.contract) ----------
+export function contractDefaults(q) {
+  const f = firmaFor(q);
+  const names = (q.items || []).filter((r) => r.name && r.typ !== 'mapei' && r.typ !== 'kabe').map((r) => r.name);
+  return { date: isoToday(), place: '', from: '', to: '', advance: '', advanceDue: '', finalDue: 7, warranty: 36, birth: '', bank: '', techC: '', techZ: f.name || '', works: names.slice(0, 12).join('; '), startBefore: false, photoConsent: '' };
+}
+
+export function contractDoc(q) {
+  F = firmaFor(q);
+  const f = F; const c = { ...contractDefaults(q), ...((q.settlement && q.settlement.contract) || {}) };
+  const items = (q.items || []).filter((r) => r.name);
+  const total = quoteTotal(items);
+  const dots = (v, n = 18) => (v ? esc(v) : '.'.repeat(n));
+  const d = (v) => (v ? fmtDate(v) : '..........');
+  const art = (letter, title, body) => `<div class="keep" style="margin-top:3.5mm"><div style="font-weight:800;font-size:10.5pt">${letter}. ${title}</div><div style="font-size:9.3pt;line-height:1.38">${body}</div></div>`;
+  const ol = (arr) => `<ol style="margin:1mm 0 0;padding-left:5mm">${arr.map((x) => `<li style="margin-bottom:.8mm">${x}</li>`).join('')}</ol>`;
+  const adv = parseNum(c.advance);
+  const pay = [
+    adv ? `Objednatel uhradí zálohu ve výši ${kc(adv)} ${c.advanceDue ? 'do ' + esc(String(c.advanceDue)) + ' ' : ''}na základě zálohové faktury zhotovitele.` : 'Záloha se nesjednává.',
+    `Po dokončení prací zhotovitel vystaví konečnou fakturu (finální vyúčtování skutečně provedených prací) se zápočtem uhrazené zálohy, se splatností ${esc(String(c.finalDue || 7))} kalendářních dní.`,
+    'Platba se provádí bankovním převodem na účet zhotovitele uvedený na faktuře.'];
+  const html = `<div class="doc">${headBar('SMLOUVA O DÍLO')}
+    <div style="text-align:center;font-size:9pt;margin:1mm 0 2mm">uzavřená podle § 2586 a násl. zákona č. 89/2012 Sb., občanský zákoník</div>
+    <div class="parties">
+      <div class="cus"><div class="lab">Objednatel</div><b>${esc(q.customer_name || '')}</b>
+        <div>Trvalý pobyt / sídlo: ${dots(q.customer_address, 12)}</div><div>Datum narození: ${c.birth ? fmtDate(c.birth) : '..........'}</div>
+        <div>Kontakt: ${dots(q.customer_contact, 12)}</div>${c.bank ? `<div>Bankovní spojení: ${esc(c.bank)}</div>` : ''}
+        <div style="margin-top:1mm">Za objednatele ve věcech smluvních i technických jedná: ${dots(c.techC || q.customer_name, 12)}</div></div>
+      <div class="sup"><div class="lab">Zhotovitel</div><b>${esc(f.name)}</b>
+        <div>Adresa: ${esc(f.address)}</div><div>Oprávnění: fyzická osoba zapsaná v živnostenském rejstříku</div>
+        <div>IČO: ${esc(f.ico)} · DIČ: není plátcem DPH</div><div>Bankovní spojení: ${esc(f.bank || '')} ${esc(f.account || '')}</div>
+        <div style="margin-top:1mm">Za zhotovitele ve věcech smluvních i technických jedná: ${esc(c.techZ || f.name)}</div></div>
+    </div>
+    <div style="margin-top:2mm;font-size:9.3pt">uzavírají tuto smlouvu o dílo (dále jen „smlouva“):</div>
+    <div style="margin-top:2mm;font-size:9.3pt"><b>Název akce a místo plnění:</b> „${esc(q.project || '')}“</div>
+    ${art('A', 'Předmět smlouvy', ol([
+      `Zhotovitel se zavazuje provést pro objednatele na svůj náklad a nebezpečí dílo: obkladačské a související práce v rozsahu cenové nabídky č. ${esc(q.number)} ze dne ${fmtDate(q.issued_on)}, která tvoří přílohu č. 1 a nedílnou součást této smlouvy. Jedná se zejména o tyto práce: ${esc(c.works || '………')}.`,
+      'Objednatel se zavazuje dílo převzít a zaplatit za ně zhotoviteli cenu sjednanou v čl. C této smlouvy.',
+      'Dojde-li při realizaci ke změnám, doplňkům nebo k rozšíření či zúžení rozsahu oproti původnímu zadání ze strany objednatele, zhotovitel provede soupis těchto změn, ocení je podle cen v příloze č. 1 (nebo vyčíslí odpočty) a předloží jej objednateli k odsouhlasení formou dodatku ke smlouvě (stačí textová forma, např. e-mail).']))}
+    ${art('B', 'Termíny plnění', ol([
+      `Zhotovitel se zavazuje provést dílo v termínu od ${d(c.from)} do ${d(c.to)}.`,
+      'Termín provádění díla se prodlužuje o dobu trvání překážky: a) z důvodů na straně objednatele, které zhotoviteli znemožňují pokračovat v práci, b) vyšší moci nebo jiných okolností neovlivnitelných zhotovitelem, c) v důsledku objednatelem odsouhlasených změn v rozsahu nebo druhu prací, d) při prodlení objednatele s úhradou faktur delším než 10 kalendářních dní.']))}
+    ${art('C', 'Cena', ol([
+      `Cena díla je podle přílohy č. 1 orientačně stanovena na ${kc(total)}. Zhotovitel není plátcem DPH, cena je konečná a žádná daň se k ní nepřipočítává.`,
+      'Konečná cena se určí finálním vyúčtováním skutečně provedených prací podle jednotkových cen v příloze č. 1. Zjistí-li zhotovitel, že konečná cena bude podstatně vyšší než orientační cena, oznámí to objednateli bez zbytečného odkladu a rozsah prací nebo cenu s ním odsouhlasí.']))}
+    ${art('D', 'Platební podmínky', ol(pay))}
+    ${art('E', 'Práva a povinnosti smluvních stran', ol([
+      'Zhotovitel provede dílo s odbornou péčí, v požadované kvalitě, včas a v souladu s platnými právními a technickými normami.',
+      'Zhotovitel vyzve objednatele ke kontrole prací, které budou v dalším postupu zakryty nebo se stanou nepřístupnými.',
+      'Zhotovitel může provádět fotodokumentaci důležitých částí díla pro účely archivace a případného doložení bezvadného provedení prací a tyto fotografie na požádání poskytne.',
+      'Objednatel je povinen včas odsouhlasit nebo konkrétně specifikovat rozhodnutí, na která zhotovitel upozorní (výběr materiálu, rozložení obkladu, barvy spár apod.). Neučiní-li tak ve lhůtě, prodlužuje se o dobu trvání této překážky termín dokončení.',
+      'Objednatel se dostaví na vyzvání k předání a převzetí díla nebo ke kontrole vybraných částí.',
+      'Zjistí-li zhotovitel při provádění díla skryté překážky, které znemožňují provést dílo dohodnutým způsobem, oznámí to bez zbytečného odkladu objednateli a navrhne změnu díla. Do dosažení dohody může provádění přerušit. Nedohodnou-li se strany v přiměřené lhůtě, může kterákoli z nich od smlouvy odstoupit. Zhotovitel má nárok na cenu části díla provedené do doby, než překážku mohl při vynaložení potřebné péče odhalit.',
+      'Zhotovitel po dokončení díla prostor vyklidí a provede hrubý úklid.']))}
+    ${art('F', 'Předání staveniště a díla', ol([
+      'Objednatel předá zhotoviteli místo provádění díla nejpozději v termínu zahájení prací a zajistí funkční přípojky elektřiny a vody.',
+      'Zhotovitel vyzve objednatele k předání dokončeného díla nejméně 3 pracovní dny předem. O předání bude sepsán předávací protokol, který podepíší obě strany.',
+      'Objednatel nemůže odmítnout převzetí díla pro ojedinělé drobné vady, které samy o sobě ani ve spojení s jinými nebrání užívání díla funkčně ani esteticky a podstatně jej neomezují. Tyto vady uvede do předávacího protokolu a zhotovitel je odstraní v dohodnutém termínu.']))}
+    ${art('G', 'Odpovědnost za vady a záruka', ol([
+      'Zhotovitel odpovídá za vady, které má dílo v době předání, a za vady zjištěné v záruční době. Práva z vadného plnění se řídí občanským zákoníkem.',
+      `Záruční doba na provedené obkladačské práce činí ${esc(String(c.warranty || 36))} měsíců od předání díla. U dodaných výrobků a komponent platí záruční doba uvedená v záručním listu výrobce.`,
+      'Zhotovitel neodpovídá za vady způsobené nesprávným užíváním, zanedbáním údržby, běžným opotřebením nebo poškozením zaviněným objednatelem či třetí osobou.',
+      'Objednatel oznámí vady písemně (e-mailem nebo dopisem) bez zbytečného odkladu po jejich zjištění a popíše, jak se projevují. Zhotovitel do 15 dnů písemně oznámí, zda reklamaci uznává, případně z jakého důvodu ji neuznává.']))}
+    ${art('H', 'Informace pro spotřebitele a právo odstoupit od smlouvy', ol([
+      'Je-li objednatel spotřebitelem a smlouva byla uzavřena mimo obchodní prostory zhotovitele (např. v místě nemovitosti objednatele) nebo na dálku, je oprávněn od ní odstoupit bez udání důvodu ve lhůtě 14 dnů ode dne uzavření smlouvy (§ 1829 občanského zákoníku). Odstoupení lze oznámit jednoznačným prohlášením zaslaným na adresu nebo e-mail zhotovitele, lze využít vzorový formulář v příloze č. 2.',
+      'Objednatel potvrzuje, že před uzavřením smlouvy obdržel informace podle § 1820 občanského zákoníku (obsažené v cenové nabídce a v této smlouvě) a vzorový formulář pro odstoupení.',
+      c.startBefore
+        ? '<b>Objednatel výslovně žádá, aby zhotovitel zahájil práce před uplynutím lhůty pro odstoupení.</b> Je si vědom, že při odstoupení uhradí poměrnou část ceny za plnění poskytnuté do odstoupení (§ 1834) a že po úplném provedení díla s jeho souhlasem právo odstoupit zaniká (§ 1837 písm. a).'
+        : 'Zhotovitel zahájí práce až po uplynutí lhůty pro odstoupení, pokud objednatel nepožádá o dřívější zahájení v samostatném prohlášení.',
+      'Subjektem mimosoudního řešení spotřebitelských sporů je Česká obchodní inspekce, Štěpánská 567/15, 120 00 Praha 2, www.coi.cz (adr.coi.cz).']))}
+    ${art('I', 'Další ujednání', ol([
+      'Smluvní strany se zavazují chránit informace označené druhou stranou jako důvěrné.',
+      'Nastanou-li u některé strany skutečnosti bránící řádnému plnění smlouvy, oznámí to druhé straně bez zbytečného odkladu, nejpozději do tří dnů, a vyvolá jednání.',
+      'Zhotovitel zpracovává osobní údaje objednatele jen pro přípravu nabídky, plnění smlouvy a plnění zákonných povinností a nepředává je dalším osobám. Podrobnosti jsou v zásadách ochrany osobních údajů na webu zhotovitele.',
+      c.photoConsent === 'ano' ? 'Objednatel souhlasí s použitím fotografií hotového díla bez identifikace osob a adresy na webu a sociálních sítích zhotovitele. Souhlas je dobrovolný a lze jej kdykoli odvolat.' : (c.photoConsent === 'ne' ? 'Objednatel nesouhlasí s použitím fotografií hotového díla na webu a sociálních sítích zhotovitele.' : 'Použití fotografií hotového díla na webu a sociálních sítích je možné jen s dalším souhlasem objednatele.')]))}
+    ${art('J', 'Prodlení, smluvní sankce, odstoupení od smlouvy', ol([
+      'Je-li objednatel v prodlení s platbou, je zhotovitel oprávněn požadovat smluvní pokutu 0,05 % z dlužné částky za každý den prodlení.',
+      'Je-li zhotovitel v prodlení s termínem dokončení prací, je objednatel oprávněn požadovat smluvní pokutu 0,05 % z ceny díla za každý den prodlení.',
+      'Nárok na náhradu škody není smluvní pokutou dotčen.',
+      'Zhotovitel může od smlouvy odstoupit v případech stanovených právními předpisy, při prodlení objednatele s úhradou ceny déle než 21 dnů, v případě úpadku objednatele a při přerušení díla z viny objednatele delším než 30 dnů.',
+      'Objednatel může od smlouvy odstoupit v případech stanovených právními předpisy, při prodlení zhotovitele s prováděním díla o více než 30 dnů a v případě úpadku zhotovitele.',
+      'Po odstoupení si strany do 5 dnů předají dosud provedené práce, o čemž sepíšou zápis s popisem rozpracovanosti a oceněním. Zhotoviteli náleží část ceny odpovídající rozsahu provedených prací.']))}
+    ${art('K', 'Závěrečná ustanovení', ol([
+      'Smlouva je vyhotovena ve dvou stejnopisech, každá strana obdrží jeden.',
+      'Smlouva nabývá platnosti a účinnosti dnem podpisu oběma stranami.',
+      'Strany prohlašují, že si smlouvu přečetly, že odpovídá jejich svobodné a vážné vůli, že byla uzavřena dobrovolně a nikoli v tísni za nápadně nevýhodných podmínek, a na důkaz souhlasu ji podepisují.',
+      `Přílohy: č. 1 cenová nabídka č. ${esc(q.number)} ze dne ${fmtDate(q.issued_on)}; č. 2 poučení a vzorový formulář pro odstoupení od smlouvy.`]))}
+    <div class="keep"><div style="font-size:9.3pt;margin-top:4mm">V ${dots(c.place, 12)} dne ${d(c.date)}</div>
+    <div style="display:flex;gap:12mm;margin-top:12mm"><div style="flex:1;border-top:1px solid #222;padding-top:1mm;font-size:9pt"><b>Za objednatele</b><br>${esc(q.customer_name || '')}</div><div style="flex:1;border-top:1px solid #222;padding-top:1mm;font-size:9pt"><b>Za zhotovitele</b><br>${esc(f.name)}</div></div></div>
+    <div class="pagebreak"></div>
+    ${headBar('PŘÍLOHA Č. 2')}
+    <div style="font-weight:800;font-size:12pt;margin:4mm 0 2mm">Poučení o právu odstoupit od smlouvy a vzorový formulář</div>
+    <div style="font-size:9.5pt;line-height:1.45">Jste-li spotřebitel, máte právo odstoupit od této smlouvy bez udání důvodu ve lhůtě 14 dnů ode dne uzavření smlouvy. K dodržení lhůty stačí, odešlete-li oznámení o odstoupení před jejím uplynutím. Oznámení zašlete na: <b>${esc(f.name)}, ${esc(f.address)}, ${esc(f.email || '')}</b>. Můžete použít formulář níže, není to však povinné.<br><br>Odstoupíte-li od smlouvy, vrátíme vám všechny přijaté platby bez zbytečného odkladu, nejpozději do 14 dnů od oznámení o odstoupení. Pokud jste požádali o zahájení prací před uplynutím lhůty, uhradíte poměrnou část ceny za plnění poskytnuté do okamžiku odstoupení (§ 1834 občanského zákoníku).</div>
+    <div class="notebox" style="margin-top:5mm;font-size:9.5pt;line-height:1.7"><b>Oznámení o odstoupení od smlouvy</b><br>Adresát: ${esc(f.name)}, ${esc(f.address)}, ${esc(f.email || '')}<br>Oznamuji, že tímto odstupuji od smlouvy o dílo č. ${esc(q.number)} na akci „${esc(q.project || '')}“.<br>Datum uzavření smlouvy: ............................<br>Jméno a příjmení spotřebitele: ................................................<br>Adresa spotřebitele: ................................................................<br>Podpis spotřebitele (pouze při papírové podobě): ...........................<br>Datum: ............................</div>
+    ${footer()}</div>`;
+  return html;
 }

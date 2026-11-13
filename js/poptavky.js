@@ -1,7 +1,7 @@
 // Poptávky z veřejného webu: seznam, fotografie, stavy, poznámka, vytvoření nabídky.
 // Data zapisuje Edge Function "poptavka"; aplikace je čte jen po přihlášení (pravidla RLS).
 import { h, toast, confirmBox, fmtDate } from './util.js';
-import { sb, newQuote, saveQuote } from './store.js';
+import { sb, newQuote, saveQuote, S } from './store.js';
 import { createDraftQuote } from './odhad.js';
 import { openCalcView } from './vypocet.js';
 import { openPaymentDialog, PAYMENT_FEE } from './email.js';
@@ -14,6 +14,48 @@ const ACTIVE = ['nova', 'k_odsouhlaseni', 'kontaktovan', 'nabidka', 'balicek', '
 const FILTERS = [['pozor', 'Čeká na mě', ['nova', 'k_odsouhlaseni', 'balicek']], ['aktivni', 'Aktivní', ACTIVE], ['vyrizene', 'Vyřízené a zamítnuté', ['uzavreno', 'zamitnuto']], ['vse', 'Vše', null]];
 
 const BUCKET = 'inquiry-photos';
+const KEEP_YEARS = 3; // zásady ochrany osobních údajů: poptávky bez zakázky nejdéle 3 roky
+const REMIND_DAYS = 365;
+
+// Záznam o kontrolách a mazání (settings.gdpr) slouží jako doklad, že se doba uchování dodržuje.
+async function gdprState() {
+  const { data } = await sb.from('settings').select('value').eq('key', 'gdpr').maybeSingle();
+  const v = (data && data.value) || {};
+  return { last: v.last || null, log: Array.isArray(v.log) ? v.log : [] };
+}
+async function gdprSave(st) {
+  const { error } = await sb.from('settings').upsert({ key: 'gdpr', value: { last: st.last, log: st.log.slice(-30) } });
+  if (error) throw error;
+}
+
+// Smaže poptávky starší než KEEP_YEARS let včetně fotografií a zapíše to do záznamu.
+export async function cleanupOldInquiries(onDone) {
+  try {
+    const cut = new Date(); cut.setFullYear(cut.getFullYear() - KEEP_YEARS);
+    const { data, error } = await sb.from('inquiries').select('id, photos, created_at').lt('created_at', cut.toISOString()).limit(500);
+    if (error) throw error;
+    const rows = data || [];
+    const msg = rows.length
+      ? `Smazat ${rows.length} poptávek starších než ${KEEP_YEARS} roky (přijatých před ${fmtDate(cut)}) včetně fotografií? Nelze vrátit zpět. Nabídky a zakázky se nemažou.`
+      : `Poptávky starší než ${KEEP_YEARS} roky (před ${fmtDate(cut)}) nejsou. Zapsat do záznamu, že kontrola proběhla?`;
+    if (!(await confirmBox(msg))) return;
+    let photos = 0;
+    for (const r of rows) {
+      const paths = (Array.isArray(r.photos) ? r.photos : []).map((x) => x.path);
+      if (paths.length) { const { error: e1 } = await sb.storage.from(BUCKET).remove(paths); if (e1) throw e1; photos += paths.length; }
+      const { error: e2 } = await sb.from('inquiries').delete().eq('id', r.id);
+      if (e2) throw e2;
+    }
+    const st = await gdprState();
+    const now = new Date().toISOString();
+    st.last = now;
+    st.log.push({ date: now, by: (S.profile || ''), older_than: cut.toISOString().slice(0, 10), inquiries: rows.length, photos });
+    await gdprSave(st);
+    toast(rows.length ? `Smazáno poptávek: ${rows.length}` : 'Kontrola zapsána');
+    if (onDone) onDone();
+  } catch (er) { toast('Mazání se nepodařilo: ' + er.message, 'err'); }
+}
+
 
 function fmtDateTime(iso) {
   const d = new Date(iso);
@@ -169,6 +211,7 @@ export async function inquiriesView(root) {
 
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Poptávky z webu'),
+      h('button', { class: 'btn ghost small', title: 'Jednou ročně: smazat poptávky starší než 3 roky (zásady ochrany osobních údajů)', onclick: () => cleanupOldInquiries(() => inquiriesView(root)) }, 'Smazat staré (3 roky)'),
       h('select', { onchange: (e) => { filter = e.target.value; draw(); } }, FILTERS.map(([k, l]) => h('option', { value: k, selected: k === filter }, l)))),
     list);
   draw();
@@ -179,6 +222,7 @@ export async function inquiriesBanner(main) {
   try {
     if ((location.hash || '').startsWith('#/poptavky')) return;
     await autoDrafts().catch(() => 0); // z nových poptávek s rozměry připraví návrh nabídky
+    gdprReminder(main);
     const n = await countNewInquiries();
     if (!n) return;
     const el = h('div', { class: 'banner' },
@@ -187,4 +231,18 @@ export async function inquiriesBanner(main) {
       h('button', { class: 'btn small ghost', onclick: () => el.remove() }, '×'));
     main.parentNode.insertBefore(el, main);
   } catch (_) { /* upozornění je jen doplněk */ }
+}
+
+// Jednou za rok připomene mazání starých poptávek. Při prvním spuštění se jen zapíše výchozí datum.
+async function gdprReminder(main) {
+  try {
+    const st = await gdprState();
+    if (!st.last) { st.last = new Date().toISOString(); await gdprSave(st); return; }
+    if ((Date.now() - new Date(st.last).getTime()) / 86400000 < REMIND_DAYS) return;
+    const el = h('div', { class: 'banner' },
+      h('span', null, `Jednou ročně: smažte poptávky starší než ${KEEP_YEARS} roky (ochrana osobních údajů). Poslední kontrola: ${fmtDate(new Date(st.last))}. `),
+      h('button', { class: 'btn small gold', onclick: () => cleanupOldInquiries(() => el.remove()) }, 'Provést'),
+      h('button', { class: 'btn small ghost', onclick: () => el.remove() }, '×'));
+    main.parentNode.insertBefore(el, main);
+  } catch (_) { /* připomínka je jen doplněk */ }
 }

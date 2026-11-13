@@ -79,6 +79,8 @@ export async function handoverView(root, id) {
       h('label', { class: 'row', style: { gap: '6px', alignItems: 'center', marginBottom: '8px' } }, noDefCb, 'Dílo předáno bez vad a nedodělků'),
       defBox, h('button', { class: 'btn ghost small', onclick: () => { ho.defects.push({ text: '', due: '' }); setNoDef(false); drawDef(); touch(); } }, '+ Přidat vadu'),
       h('div', { style: { marginTop: '10px' } }, fld('Poznámka', h('textarea', { oninput: bind('note') }, ho.note || '')))),
+    h('div', { class: 'card' }, h('h2', null, 'Fotografie hotového díla'), h('p', { class: 'muted' }, 'Souhlas zákazníka s použitím fotek na webu a sociálních sítích (bez identifikace osob a adresy). Vytiskne se do protokolu.'),
+      fld('Souhlas', h('select', { onchange: bind('photoConsent') }, [['', 'Nezvoleno'], ['ano', 'Souhlasí'], ['ne', 'Nesouhlasí']].map(([v, l]) => h('option', { value: v, selected: (ho.photoConsent || '') === v }, l))))),
     h('div', { class: 'card' }, h('h2', null, 'Podpisy'), h('div', { class: 'grid c2' },
       h('div', null, fld('Objednatel – jméno', h('input', { type: 'text', value: ho.nameC || '', oninput: bind('nameC') })), sigPad(() => ho.sigC, (v) => { ho.sigC = v; touch(); }, 'Podpis objednatele')),
       h('div', null, fld('Zhotovitel – jméno', h('input', { type: 'text', value: ho.nameZ || '', placeholder: S.firma && S.firma.name || '', oninput: bind('nameZ') })), sigPad(() => ho.sigZ, (v) => { ho.sigZ = v; touch(); }, 'Podpis zhotovitele')))),
