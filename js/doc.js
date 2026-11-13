@@ -257,8 +257,8 @@ export function handoverDoc(q) {
 export function consumerInfo(f) {
   return `<div class="keep" style="margin-top:3mm;font-size:8.3pt;line-height:1.35;color:#374151">
     <div class="lab">Informace pro spotřebitele (§ 1820 občanského zákoníku)</div>
-    <div><b>Dodavatel:</b> ${esc(f.name)}, ${esc(f.address)}, IČO ${esc(f.ico)}, tel. ${esc(f.phone)}${f.email ? ', e-mail ' + esc(f.email) : ''}. Práce provádíme v místě zakázky, provozovna je shodná se sídlem.</div>
-    <div><b>Cena a platba:</b> cena je orientační, konečná cena vyplyne z vyúčtování skutečně provedených prací. Dodavatel není plátcem DPH. Doprava je zahrnuta v ceně prací. Platba bankovním převodem, případnou zálohu a splatnost stanoví smlouva o dílo nebo faktura.</div>
+    <div><b>Dodavatel:</b> ${esc(f.name)}, ${esc(f.address)}, IČO ${esc(f.ico)}, tel. ${esc(f.phone)}${f.email ? ', e-mail ' + esc(f.email) : ''}. Obchodní prostory pro styk se zákazníky nemáme, práce provádíme v místě zakázky.</div>
+    <div><b>Cena a platba:</b> cena je orientační, konečná cena vyplyne z vyúčtování skutečně provedených prací. Dodavatel není plátcem DPH. Platba bankovním převodem, případnou zálohu a splatnost stanoví smlouva o dílo nebo faktura.</div>
     <div><b>Právo odstoupit od smlouvy:</b> bude-li smlouva uzavřena na dálku (e-mailem, telefonem) nebo mimo obchodní prostory dodavatele (např. v místě vaší nemovitosti), můžete od ní jako spotřebitel odstoupit bez udání důvodu do 14 dnů od jejího uzavření (§ 1829 občanského zákoníku). Stačí jednoznačné prohlášení zaslané na výše uvedenou adresu nebo e-mail dodavatele, můžete využít vzorový formulář, který obdržíte se smlouvou. Požádáte-li o zahájení prací před uplynutím této lhůty, uhradíte při odstoupení poměrnou část ceny za plnění poskytnuté do odstoupení (§ 1834). Právo odstoupit zaniká, jakmile je dílo s vaším výslovným souhlasem v plném rozsahu provedeno a byli jste o tom předem poučeni (§ 1837 písm. a).</div>
     <div><b>Vady a záruka:</b> dílo provádíme s odbornou péčí a odpovídáme za vady podle občanského zákoníku. Délku případné záruky za jakost uvede smlouva o dílo a předávací protokol. Vady oznamte bez zbytečného odkladu e-mailem nebo dopisem, do 15 dnů vám sdělíme, zda reklamaci uznáváme.</div>
     <div><b>Mimosoudní řešení sporů:</b> subjektem mimosoudního řešení spotřebitelských sporů je Česká obchodní inspekce, Štěpánská 567/15, 120 00 Praha 2, www.coi.cz (adr.coi.cz).</div>
@@ -310,7 +310,7 @@ export function contractDoc(q) {
       `Zhotovitel se zavazuje provést dílo v termínu od ${d(c.from)} do ${d(c.to)}.`,
       'Termín provádění díla se prodlužuje o dobu trvání překážky: a) z důvodů na straně objednatele, které zhotoviteli znemožňují pokračovat v práci, b) vyšší moci nebo jiných okolností neovlivnitelných zhotovitelem, c) v důsledku objednatelem odsouhlasených změn v rozsahu nebo druhu prací, d) při prodlení objednatele s úhradou faktur delším než 10 kalendářních dní.']))}
     ${art('C', 'Cena', ol([
-      `Cena díla je podle přílohy č. 1 orientačně stanovena na ${kc(total)}. Zhotovitel není plátcem DPH, cena je konečná a žádná daň se k ní nepřipočítává.`,
+      `Cena díla je podle přílohy č. 1 orientačně stanovena na ${kc(total)}. Zhotovitel není plátcem DPH, proto se k ceně žádná DPH nepřipočítává.`,
       'Konečná cena se určí finálním vyúčtováním skutečně provedených prací podle jednotkových cen v příloze č. 1. Zjistí-li zhotovitel, že konečná cena bude podstatně vyšší než orientační cena, oznámí to objednateli bez zbytečného odkladu a rozsah prací nebo cenu s ním odsouhlasí.']))}
     ${art('D', 'Platební podmínky', ol(pay))}
     ${art('E', 'Práva a povinnosti smluvních stran', ol([
@@ -335,7 +335,7 @@ export function contractDoc(q) {
       'Objednatel potvrzuje, že před uzavřením smlouvy obdržel informace podle § 1820 občanského zákoníku (obsažené v cenové nabídce a v této smlouvě) a vzorový formulář pro odstoupení.',
       c.startBefore
         ? '<b>Objednatel výslovně žádá, aby zhotovitel zahájil práce před uplynutím lhůty pro odstoupení.</b> Je si vědom, že při odstoupení uhradí poměrnou část ceny za plnění poskytnuté do odstoupení (§ 1834) a že po úplném provedení díla s jeho souhlasem právo odstoupit zaniká (§ 1837 písm. a).'
-        : 'Zhotovitel zahájí práce až po uplynutí lhůty pro odstoupení, pokud objednatel nepožádá o dřívější zahájení v samostatném prohlášení.',
+        : 'Zhotovitel zahájí práce až po uplynutí lhůty pro odstoupení, pokud o dřívější zahájení objednatel výslovně nepožádá.',
       'Subjektem mimosoudního řešení spotřebitelských sporů je Česká obchodní inspekce, Štěpánská 567/15, 120 00 Praha 2, www.coi.cz (adr.coi.cz).']))}
     ${art('I', 'Další ujednání', ol([
       'Smluvní strany se zavazují chránit informace označené druhou stranou jako důvěrné.',
