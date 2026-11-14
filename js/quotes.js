@@ -1,7 +1,7 @@
 // Nabídky: seznam a editor.
 import { h, kc, fmtDate, matcher, toast, confirmBox, makeSaver, parseNum, num, isoToday } from './util.js';
 import { S, sb, TYPES, STAV, PLATBA, typeLabel, typeKey, priceFor, displayName, displayUnit, lineTotal, quoteTotal,
-  listQuotes, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
+  listQuotes, listInvoices, getQuote, newQuote, newBezCN, saveQuote, deleteQuote, duplicateQuote } from './store.js';
 import { quoteDoc, printDoc } from './doc.js';
 import { photosCard } from './fotky.js';
 import { itemsEditor } from './items.js';
@@ -15,6 +15,15 @@ const stavCls = { 'Dokončena': 'ok', 'Zamítnuta': 'bad', 'Potvrzena': 'blue', 
 export async function quotesList(root) {
   root.append(h('p', { class: 'muted' }, 'Načítám…'));
   let all = await listQuotes();
+  let invs = [];
+  try { invs = await listInvoices(); } catch (e) { /* bez faktur zůstane ruční stav platby */ }
+  // Stav platby podle faktur k zakázce: všechny zaplacené = Zaplaceno, část = Záloha uhrazena; bez faktur platí ruční stav.
+  const payOf = (r) => {
+    const mine = invs.filter((i) => i.quote_id === r.id);
+    if (!mine.length) return r.payment_status;
+    const paid = mine.filter((i) => i.paid).length;
+    return paid === mine.length ? 'Zaplaceno' : paid ? 'Záloha uhrazena' : 'Nezaplaceno';
+  };
   let q = '', st = '';
   const body = h('div');
   const draw = () => {
@@ -25,7 +34,7 @@ export async function quotesList(root) {
       h('tbody', null, rows.length ? rows.map((r) => h('tr', { class: 'click', onclick: () => { location.hash = (r.settlement && r.settlement.bez ? '#/vyuctovani/' : '#/nabidka/') + r.id; } },
         h('td', null, h('b', null, r.number), r.settlement && r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null), h('td', null, fmtDate(r.issued_on)), h('td', null, r.customer_name || '—'),
         h('td', null, r.project), h('td', null, h('span', { class: 'badge ' + (stavCls[r.status] || '') }, r.status)),
-        h('td', null, h('span', { class: 'badge ' + (r.payment_status === 'Zaplaceno' ? 'ok' : r.payment_status === 'Nezaplaceno' ? '' : 'gold') }, r.payment_status)),
+        h('td', null, h('span', { class: 'badge ' + (payOf(r) === 'Zaplaceno' ? 'ok' : payOf(r) === 'Nezaplaceno' ? '' : 'gold') }, payOf(r))),
         h('td', { class: 'r' }, kc(quoteTotal(r.items || []))),
         h('td', { class: 'r' }, h('button', { class: 'btn ghost', title: 'Smazat', onclick: async (e) => { e.stopPropagation(); if (!(await confirmBox(`Smazat nabídku ${r.number}?`))) return; try { await deleteQuote(r.id); } catch (err) { return toast(err.message, 'err'); } all = all.filter((x) => x.id !== r.id); draw(); } }, 'Smazat')))) : h('tr', null, h('td', { colspan: 8, class: 'muted' }, 'Žádné nabídky.'))))));
   };
