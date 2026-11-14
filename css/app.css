@@ -181,7 +181,7 @@ table.dt tr{page-break-inside:avoid;break-inside:avoid}
 .drawer-head{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.15);color:#fff}
 .drawer-head .brand{font-weight:800;font-size:20px;letter-spacing:.5px}
 .drawer-head small{display:block;font-weight:400;font-size:11px;color:#d8c9a7}
-.drawer nav{display:flex;flex-direction:column;padding:8px}
+.drawer nav{display:flex;flex-direction:column;padding:8px 8px calc(24px + env(safe-area-inset-bottom));flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .drawer nav a{color:#e9e4d6;text-decoration:none;padding:14px 14px;border-radius:8px;font-size:17px}
 .drawer nav a.active{background:rgba(255,255,255,.14);color:#fff;font-weight:700}
 .drawer nav a.out{margin-top:14px;border-top:1px solid rgba(255,255,255,.15);border-radius:0;color:#d8c9a7}
