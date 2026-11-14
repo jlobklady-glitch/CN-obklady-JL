@@ -21,12 +21,13 @@ export async function quotesList(root) {
     const m = matcher(q);
     const rows = all.filter((r) => (!st || r.status === st) && m(`${r.number} ${r.customer_name} ${r.project}`));
     body.replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 't' },
-      h('thead', null, h('tr', null, ['Číslo', 'Datum', 'Odběratel', 'Stavba', 'Stav', 'Platba', 'Celkem'].map((t, i) => h('th', { class: i === 6 ? 'r' : '' }, t)))),
+      h('thead', null, h('tr', null, ['Číslo', 'Datum', 'Odběratel', 'Stavba', 'Stav', 'Platba', 'Celkem', ''].map((t, i) => h('th', { class: i === 6 ? 'r' : '' }, t)))),
       h('tbody', null, rows.length ? rows.map((r) => h('tr', { class: 'click', onclick: () => { location.hash = (r.settlement && r.settlement.bez ? '#/vyuctovani/' : '#/nabidka/') + r.id; } },
         h('td', null, h('b', null, r.number), r.settlement && r.settlement.bez ? h('span', { class: 'badge' }, 'bez CN') : null), h('td', null, fmtDate(r.issued_on)), h('td', null, r.customer_name || '—'),
         h('td', null, r.project), h('td', null, h('span', { class: 'badge ' + (stavCls[r.status] || '') }, r.status)),
         h('td', null, h('span', { class: 'badge ' + (r.payment_status === 'Zaplaceno' ? 'ok' : r.payment_status === 'Nezaplaceno' ? '' : 'gold') }, r.payment_status)),
-        h('td', { class: 'r' }, kc(quoteTotal(r.items || []))))) : h('tr', null, h('td', { colspan: 7, class: 'muted' }, 'Žádné nabídky.'))))));
+        h('td', { class: 'r' }, kc(quoteTotal(r.items || []))),
+        h('td', { class: 'r' }, h('button', { class: 'btn ghost', title: 'Smazat', onclick: async (e) => { e.stopPropagation(); if (!(await confirmBox(`Smazat nabídku ${r.number}?`))) return; try { await deleteQuote(r.id); } catch (err) { return toast(err.message, 'err'); } all = all.filter((x) => x.id !== r.id); draw(); } }, 'Smazat')))) : h('tr', null, h('td', { colspan: 8, class: 'muted' }, 'Žádné nabídky.'))))));
   };
   root.replaceChildren(
     h('div', { class: 'pagehead' }, h('h1', null, 'Nabídky a zakázky'),
