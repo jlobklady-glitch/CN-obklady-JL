@@ -270,9 +270,18 @@ export function consumerInfo(f) {
 // ---------- Smlouva o dílo (vzor od právníka upravený pro JL-OBKLADY; data v q.settlement.contract) ----------
 export function contractDefaults(q) {
   const f = firmaFor(q);
-  const names = (q.items || []).filter((r) => r.name && r.typ !== 'mapei' && r.typ !== 'kabe').map((r) => r.name);
-  return { date: isoToday(), place: '', from: '', to: '', advance: '', advanceDue: '', finalDue: 7, warranty: 36, birth: '', bank: '', techC: '', techZ: f.name || '', works: names.slice(0, 12).join('; '), startBefore: false, photoConsent: '' };
+  const names = (q.items || []).filter((r) => r.name && (r.typ === 'prace' || r.typ === 'ostatni')).map((r) => {
+    const nm = String(r.name).split('|')[0].trim(); const qy = parseNum(r.qty);
+    return qy ? `${nm} – ${String(qy).replace('.', ',')} ${r.unit || ''}`.trim() : nm;
+  });
+  return { date: isoToday(), place: '', from: '', to: '', advance: '', advanceDue: '', finalDue: 7, warranty: 36, birth: '', bank: '', techC: '', techZ: f.name || '', works: names.join('\n'), overrun: 10, hourly: '', startBefore: false, photoConsent: '' };
 }
+
+const worksList = (w) => {
+  const t = String(w || '').trim();
+  const lines = (t.includes('\n') ? t.split('\n') : t.split(';')).map((x) => x.trim()).filter(Boolean);
+  return lines.length ? `<ul style="margin:1mm 0 0;padding-left:5mm">${lines.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ' ………';
+};
 
 export function contractDoc(q) {
   F = firmaFor(q);
@@ -303,15 +312,19 @@ export function contractDoc(q) {
     <div style="margin-top:2mm;font-size:9.3pt">uzavírají tuto smlouvu o dílo (dále jen „smlouva“):</div>
     <div style="margin-top:2mm;font-size:9.3pt"><b>Název akce a místo plnění:</b> „${esc(q.project || '')}“</div>
     ${art('A', 'Předmět smlouvy', ol([
-      `Zhotovitel se zavazuje provést pro objednatele na svůj náklad a nebezpečí dílo: obkladačské a související práce v rozsahu cenové nabídky č. ${esc(q.number)} ze dne ${fmtDate(q.issued_on)}, která tvoří přílohu č. 1 a nedílnou součást této smlouvy. Jedná se zejména o tyto práce: ${esc(c.works || '………')}.`,
+      `Zhotovitel se zavazuje provést pro objednatele na svůj náklad a nebezpečí dílo: obkladačské a související práce v rozsahu cenové nabídky č. ${esc(q.number)} ze dne ${fmtDate(q.issued_on)}, která tvoří přílohu č. 1 a nedílnou součást této smlouvy. Rozsah prací:${worksList(c.works)}`,
       'Objednatel se zavazuje dílo převzít a zaplatit za ně zhotoviteli cenu sjednanou v čl. C této smlouvy.',
-      'Dojde-li při realizaci ke změnám, doplňkům nebo k rozšíření či zúžení rozsahu oproti původnímu zadání ze strany objednatele, zhotovitel provede soupis těchto změn, ocení je podle cen v příloze č. 1 (nebo vyčíslí odpočty) a předloží jej objednateli k odsouhlasení formou dodatku ke smlouvě (stačí textová forma, např. e-mail).']))}
+      'Dojde-li při realizaci ke změnám, doplňkům nebo k rozšíření či zúžení rozsahu oproti původnímu zadání ze strany objednatele, zhotovitel provede soupis těchto změn, ocení je podle cen v příloze č. 1 (nebo vyčíslí odpočty) a předloží jej objednateli k odsouhlasení formou dodatku ke smlouvě (stačí textová forma, např. e-mail). Vícepráce a změny ceny se dále řídí čl. C.']))}
     ${art('B', 'Termíny plnění', ol([
       `Zhotovitel se zavazuje provést dílo v termínu od ${d(c.from)} do ${d(c.to)}.`,
       'Termín provádění díla se prodlužuje o dobu trvání překážky: a) z důvodů na straně objednatele, které zhotoviteli znemožňují pokračovat v práci, b) vyšší moci nebo jiných okolností neovlivnitelných zhotovitelem, c) v důsledku objednatelem odsouhlasených změn v rozsahu nebo druhu prací, d) při prodlení objednatele s úhradou faktur delším než 10 kalendářních dní.']))}
-    ${art('C', 'Cena', ol([
+    ${art('C', 'Cena, vícepráce a změny ceny', ol([
       `Cena díla je podle přílohy č. 1 orientačně stanovena na ${kc(total)}. Zhotovitel není plátcem DPH, proto se k ceně žádná DPH nepřipočítává.`,
-      'Konečná cena se určí finálním vyúčtováním skutečně provedených prací podle jednotkových cen v příloze č. 1. Zjistí-li zhotovitel, že konečná cena bude podstatně vyšší než orientační cena, oznámí to objednateli bez zbytečného odkladu a rozsah prací nebo cenu s ním odsouhlasí.']))}
+      `Konečná cena se určí finálním vyúčtováním skutečně provedených prací podle jednotkových cen v příloze č. 1. Překročí-li konečná cena orientační cenu o více než ${esc(String(c.overrun || 10))} % z jiného důvodu než odsouhlasených víceprací, zhotovitel to objednateli oznámí bez zbytečného odkladu a rozsah prací nebo cenu s ním odsouhlasí.`,
+      'Vícepráce jsou práce, které nejsou obsaženy v příloze č. 1 a vyplynou z požadavku objednatele nebo ze skutečností zjištěných při provádění díla (např. nerovný či nesoudržný podklad, skryté vady stávajících konstrukcí, nutnost dodatečné hydroizolace, odlišné rozměry oproti zadání). Méněpráce, tedy práce z přílohy č. 1, které se neprovedou, se od ceny odečtou.',
+      'Zhotovitel provede vícepráce až po jejich odsouhlasení objednatelem v textové formě (e-mail, SMS, zpráva). Odsouhlasení obsahuje popis víceprací, jejich cenu nebo způsob jejího určení a vliv na termín dokončení. Bez odsouhlasení vícepráce neprovádí a nevzniká nárok na jejich úhradu.',
+      `Cena víceprací se určí podle jednotkových cen v příloze č. 1. Není-li příslušná položka v příloze č. 1 uvedena, určí se podle ceníku zhotovitele platného v den zadání víceprací${c.hourly ? ' nebo hodinovou sazbou ' + esc(String(c.hourly)) + ' Kč' : ', případně dohodou před jejich provedením'}.`,
+      'Neodsouhlasí-li objednatel vícepráce nezbytné k řádnému provedení díla, není zhotovitel povinen v dotčené části pokračovat a postupuje se podle čl. E bodu 6.']))}
     ${art('D', 'Platební podmínky', ol(pay))}
     ${art('E', 'Práva a povinnosti smluvních stran', ol([
       'Zhotovitel provede dílo s odbornou péčí, v požadované kvalitě, včas a v souladu s platnými právními a technickými normami.',
